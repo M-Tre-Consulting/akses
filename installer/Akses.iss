@@ -71,8 +71,10 @@ Name: "explorermenu"; Description: "{cm:ExplorerMenu}"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [InstallDelete]
-; An update replaces the tools wholesale (a newer ffmpeg has different DLL names).
-Type: filesandordirs; Name: "{app}\tools"
+; An update replaces the program folder wholesale: a trimmed build or a newer ffmpeg drops files,
+; and leftovers of the previous version would just take space. Only program files live in {app}
+; (settings, log and the downloaded pandoc are in {localappdata}\Akses).
+Type: filesandordirs; Name: "{app}\*"
 
 [Files]
 Source: "{#MyPublishDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion

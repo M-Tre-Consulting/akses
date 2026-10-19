@@ -449,8 +449,10 @@ internal sealed class FileView : UserControl
 
     // ---- jobs ----------------------------------------------------------------------------------
 
-    private void ConvertFiles(IReadOnlyList<string> files, TargetFormat target)
+    private async void ConvertFiles(IReadOnlyList<string> files, TargetFormat target)
     {
+        if (files.Any(f => DocumentEngine.NeedsPandoc(f, target)) && !ToolDownloads.PandocInstalled && !await DownloadPandocAsync())
+            return;
         foreach (string f in files)
         {
             FileKind kind = FormatCatalog.KindOf(f);
@@ -459,7 +461,55 @@ internal sealed class FileView : UserControl
         }
     }
 
-    private void RunOnTargets(string label, Func<string, IProgress<double>, CancellationToken, Task<string>> work)
+    /// <summary>
+    /// First document conversion: asks whether to download pandoc (see ToolDownloads), then shows the
+    /// download with a Cancel button. True when pandoc is ready.
+    /// </summary>
+    private async Task<bool> DownloadPandocAsync()
+    {
+        var ask = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = Strings.PandocTitle,
+            Content = new TextBlock { Text = Strings.PandocBody(ToolDownloads.PandocDownloadMb), TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = Strings.Download,
+            CloseButtonText = Strings.Cancel,
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        if (await ask.ShowAsync() != ContentDialogResult.Primary) return false;
+
+        var bar = new ProgressBar { Maximum = 100, Margin = new Thickness(0, 12, 0, 0) };
+        var text = new TextBlock { Text = Strings.PandocDownloading, TextWrapping = TextWrapping.Wrap };
+        var body = new StackPanel();
+        body.Children.Add(text);
+        body.Children.Add(bar);
+        var cts = new CancellationTokenSource();
+        var progressDialog = new ContentDialog { XamlRoot = XamlRoot, Title = Strings.PandocTitle, Content = body, CloseButtonText = Strings.Cancel };
+        progressDialog.CloseButtonClick += (_, _) => cts.Cancel();
+
+        bool ok = false;
+        Task<ContentDialogResult> shown = progressDialog.ShowAsync().AsTask();
+        try
+        {
+            await ToolDownloads.InstallPandocAsync(new Progress<double>(p => bar.Value = p * 100), cts.Token);
+            ok = true;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            AppLog.Write($"Download di pandoc fallito: {ex}");
+            text.Text = Strings.PandocFailed;
+            bar.Visibility = Visibility.Collapsed;
+            progressDialog.CloseButtonText = Strings.Close;
+            await shown;
+            return false;
+        }
+        progressDialog.Hide();
+        await shown;
+        return ok;
+    }
+
+    private void RunOnTargets(string label,Func<string, IProgress<double>, CancellationToken, Task<string>> work)
     {
         foreach (string f in Targets) RunJob(f, label, Strings.Working, (p, ct) => work(f, p, ct));
     }

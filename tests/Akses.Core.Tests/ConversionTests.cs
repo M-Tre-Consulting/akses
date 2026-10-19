@@ -23,13 +23,47 @@ public sealed class ConversionTests : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// A test clip: a moving gradient (raw RGB frames) and a 440 Hz tone (WAV), both written here and
+    /// encoded by the shipped ffmpeg. The slim build has no lavfi test sources, on purpose.
+    /// </summary>
     private async Task<string> Media(string name, bool video, double seconds = 3)
     {
+        const int w = 160, h = 120, fps = 25, rate = 44100;
         string path = Path.Combine(_dir, name);
+        string wav = Path.Combine(_dir, Path.GetFileNameWithoutExtension(name) + "-src.wav");
+        int samples = (int)(seconds * rate);
+        using (var bw = new BinaryWriter(File.Create(wav)))
+        {
+            bw.Write("RIFF"u8); bw.Write(36 + samples * 2); bw.Write("WAVEfmt "u8); bw.Write(16);
+            bw.Write((short)1); bw.Write((short)1); bw.Write(rate); bw.Write(rate * 2); bw.Write((short)2); bw.Write((short)16);
+            bw.Write("data"u8); bw.Write(samples * 2);
+            for (int i = 0; i < samples; i++) bw.Write((short)(Math.Sin(2 * Math.PI * 440 * i / rate) * 8000));
+        }
+
         var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
-        if (video) args.AddRange(["-f", "lavfi", "-i", $"testsrc=size=320x240:rate=25:duration={seconds}"]);
-        args.AddRange(["-f", "lavfi", "-i", $"sine=frequency=440:duration={seconds}"]);
-        if (video) args.AddRange(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "25"]);
+        if (video)
+        {
+            string raw = Path.Combine(_dir, Path.GetFileNameWithoutExtension(name) + "-src.rgb");
+            int frames = (int)(seconds * fps);
+            var frame = new byte[w * h * 3];
+            using (FileStream fs = File.Create(raw))
+            {
+                for (int f = 0; f < frames; f++)
+                {
+                    for (int y = 0; y < h; y++)
+                        for (int x = 0; x < w; x++)
+                        {
+                            int o = (y * w + x) * 3;
+                            frame[o] = (byte)(x + f * 4); frame[o + 1] = (byte)(y * 2); frame[o + 2] = (byte)(f * 6);
+                        }
+                    fs.Write(frame);
+                }
+            }
+            args.AddRange(["-f", "rawvideo", "-pix_fmt", "rgb24", "-s", $"{w}x{h}", "-r", $"{fps}", "-i", raw]);
+        }
+        args.AddRange(["-i", wav]);
+        if (video) args.AddRange(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "25", "-c:a", "aac", "-shortest"]);
         args.Add(path);
         await Tools.RunAsync(Tools.Ffmpeg, args, CancellationToken.None);
         return path;

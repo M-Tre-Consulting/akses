@@ -9,7 +9,6 @@ internal sealed class Settings
     public static readonly string DataFolder = CreateDataFolder();
 
     private static readonly string FilePath = Path.Combine(DataFolder, "settings.json");
-    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
     public static Settings Current { get; } = Load();
 
@@ -33,7 +32,7 @@ internal sealed class Settings
         try
         {
             if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath), Json) ?? new Settings();
+                return JsonSerializer.Deserialize(File.ReadAllText(FilePath), AppJson.Default.Settings) ?? new Settings();
         }
         catch (Exception ex)
         {
@@ -44,7 +43,16 @@ internal sealed class Settings
 
     public void Save()
     {
-        try { File.WriteAllText(FilePath, JsonSerializer.Serialize(this, Json)); }
+        try { File.WriteAllText(FilePath, JsonSerializer.Serialize(this, AppJson.Default.Settings)); }
         catch (Exception ex) { AppLog.Write($"Salvataggio impostazioni fallito: {ex.Message}"); }
     }
 }
+
+/// <summary>
+/// JSON written at compile time (source generation) instead of by reflection, so the trimmed
+/// Release build (PublishTrimmed in the csproj) can't drop what it needs.
+/// </summary>
+[System.Text.Json.Serialization.JsonSourceGenerationOptions(WriteIndented = true)]
+[System.Text.Json.Serialization.JsonSerializable(typeof(Settings))]
+[System.Text.Json.Serialization.JsonSerializable(typeof(string[]))]
+internal sealed partial class AppJson : System.Text.Json.Serialization.JsonSerializerContext;

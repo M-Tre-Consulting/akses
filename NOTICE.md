@@ -3,28 +3,41 @@
 Akses è © M-Tre Consulting ed è rilasciato sotto **GNU GPL v3** (vedi [LICENSE](LICENSE)).
 Fa il lavoro pesante con questi progetti open source, che ringraziamo.
 
-## Programmi inclusi nell'installer (cartella `tools\`)
+## Programmi esterni
 
-Sono eseguibili separati, scaricati da `installer/fetch-tools.ps1` con versione e SHA-256 fissati,
-e lanciati da Akses come processi a parte. Ciascuno ha la propria licenza, copiata accanto.
+Sono eseguibili separati, lanciati da Akses come processi a parte. Ciascuno ha la propria licenza,
+copiata accanto.
 
-### FFmpeg — audio, video e sottotitoli
+### FFmpeg — audio, video e sottotitoli (incluso nell'installer, `tools\ffmpeg\`)
 
-<https://ffmpeg.org> — build **GPL shared** di <https://github.com/BtbN/FFmpeg-Builds>
-(FFmpeg 9.0, `autobuild-2026-10-19-13-06`). Licenza **GPL v3** per questa build, perché include
-librerie GPL: x264, x265, libvpx, libaom, SVT-AV1, LAME, Opus, Vorbis, dav1d, libass, libwebp e
-altre (elenco completo nel `LICENSE.txt` della build, in `tools\ffmpeg\`).
+<https://ffmpeg.org> — FFmpeg 9.0.2 **compilato apposta per Akses** da `installer/build-ffmpeg.sh`
+(mingw-w64, ogni sorgente fissato a un tag): tutti i decoder, solo gli encoder e i contenitori che
+Akses scrive, così pesa circa un quinto della build generica. Librerie incluse, ciascuna alla
+versione indicata nello script e in `tools\ffmpeg\BUILD.txt`:
 
-La GPL di questa build è uno dei motivi per cui Akses è a sua volta sotto GPL v3, come WinPlay
-Mahogany: il sorgente di ogni versione si scarica dal sito accanto all'installer.
+| Libreria | Uso | Licenza |
+|---|---|---|
+| [x264](https://www.videolan.org/developers/x264.html) | video H.264 (MP4, MOV, MKV) | GPL v2+ |
+| [libvpx](https://chromium.googlesource.com/webm/libvpx) | video VP9/VP8 (WebM) | BSD |
+| [dav1d](https://code.videolan.org/videolan/dav1d) | lettura video AV1 | BSD |
+| [LAME](https://lame.sourceforge.io) | MP3 | LGPL |
+| [Opus](https://opus-codec.org), [Ogg/Vorbis](https://xiph.org) | Opus, OGG | BSD |
+| [zlib](https://zlib.net) | compressione | zlib |
+
+FFmpeg con x264 è sotto **GPL v3**: è uno dei motivi per cui Akses è a sua volta sotto GPL v3, come
+WinPlay Mahogany. Il sorgente di Akses è in questa repo; quello di FFmpeg e delle librerie è ai tag
+indicati, oppure si chiede a info@mtre-consulting.it.
 
 Nota: alcuni formati (H.264, HEVC, AAC…) sono coperti da brevetti in alcuni paesi. Akses li usa
 tramite FFmpeg come fanno i principali programmi open source di conversione.
 
-### pandoc — documenti
+### pandoc — documenti (scaricato alla prima conversione di un documento)
 
-<https://pandoc.org> — © John MacFarlane, licenza **GPL v2 o successiva** (`tools\pandoc\COPYING.rtf`).
-Versione 3.12.1, release ufficiale.
+<https://pandoc.org> — © John MacFarlane, licenza **GPL v2 o successiva**. Versione 3.12.1, release
+ufficiale da GitHub. Non è nell'installer (pesa 225 MB): Akses lo scarica solo se l'utente converte
+un documento e accetta, ne controlla lo SHA-256 (`src/Akses.Core/ToolDownloads.cs`) e lo tiene in
+`%LOCALAPPDATA%\Akses\tools\pandoc\`, con il suo `COPYRIGHT.txt` e `COPYING.rtf`. Per sviluppare,
+`installer/fetch-tools.ps1` lo mette in `tools\pandoc\`.
 
 ## Librerie .NET (dentro l'app)
 

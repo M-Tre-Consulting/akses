@@ -4,10 +4,12 @@
 
 .DESCRIPTION
     One command, same shape as WinPlay Mahogany's build-installer.ps1:
-      1. fetch-tools.ps1: pinned, SHA-256-checked ffmpeg and pandoc in tools\.
-      2. `dotnet publish` the WinUI 3 app, self-contained win-x64 (no .NET runtime needed).
+      1. Check that tools\ffmpeg is the slim build of build-ffmpeg.sh (run it in WSL first).
+         pandoc is not shipped: the app downloads it on the first document conversion
+         (src/Akses.Core/ToolDownloads.cs).
+      2. `dotnet publish` the WinUI 3 app, self-contained win-x64 and trimmed (no .NET runtime needed).
       3. Copy the app's .pri/.xbf (dotnet publish drops them for unpackaged WinUI 3 apps), copy
-         tools\ffmpeg and tools\pandoc in, strip WPF/WinForms dead weight.
+         tools\ffmpeg in, strip WPF/WinForms dead weight.
       4. Run installer\Akses.iss through ISCC.exe.
 
     Output: installer\output\Akses-Setup-<version>.exe
@@ -23,8 +25,10 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $appProject = Join-Path $root "src\Akses.App\Akses.App.csproj"
 
-Write-Host "==> Tools (ffmpeg, pandoc)" -ForegroundColor Cyan
-& (Join-Path $PSScriptRoot "fetch-tools.ps1")
+Write-Host "==> Checking tools\ffmpeg (slim build)" -ForegroundColor Cyan
+if (-not (Test-Path (Join-Path $root "tools\ffmpeg\BUILD.txt"))) {
+    throw "tools\ffmpeg is not the slim build. Run first:  wsl -d Arch -u root -- bash installer/build-ffmpeg.sh"
+}
 
 Write-Host "==> dotnet publish (Release, win-x64, self-contained)" -ForegroundColor Cyan
 dotnet publish $appProject -c Release -r win-x64 --self-contained true
@@ -39,15 +43,11 @@ $xamlOutputFiles = Get-ChildItem $buildOutDir -File | Where-Object { $_.Name -eq
 if ($xamlOutputFiles.Count -eq 0) { throw "No .pri/.xbf files found in $buildOutDir - did the build actually run?" }
 foreach ($f in $xamlOutputFiles) { Copy-Item $f.FullName -Destination $publishDir -Force }
 
-Write-Host "==> Copying tools\ffmpeg and tools\pandoc" -ForegroundColor Cyan
+Write-Host "==> Copying tools\ffmpeg" -ForegroundColor Cyan
 $toolsOut = Join-Path $publishDir "tools"
 if (Test-Path $toolsOut) { Remove-Item $toolsOut -Recurse -Force }
 New-Item -ItemType Directory $toolsOut | Out-Null
-foreach ($t in @("ffmpeg", "pandoc")) {
-    $src = Join-Path $root "tools\$t"
-    if (-not (Test-Path $src)) { throw "tools\$t missing - fetch-tools.ps1 should have created it" }
-    Copy-Item $src -Destination $toolsOut -Recurse
-}
+Copy-Item (Join-Path $root "tools\ffmpeg") -Destination $toolsOut -Recurse
 
 # Self-contained publish for net9.0-windows + UseWinUI drags in the whole Windows Desktop runtime
 # (WPF + WinForms, ~64 MB) that a WinUI 3 app never loads. Same list as WinPlay Mahogany.

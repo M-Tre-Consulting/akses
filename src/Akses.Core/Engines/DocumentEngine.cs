@@ -33,6 +33,14 @@ public static class DocumentEngine
         tr, img, pre { break-inside: avoid; }
         """;
 
+    /// <summary>
+    /// True when this conversion goes through pandoc, which Akses downloads on first use
+    /// (<see cref="ToolDownloads"/>). HTML and plain text to PDF only need WebView2.
+    /// </summary>
+    public static bool NeedsPandoc(string input, TargetFormat target) =>
+        FormatCatalog.KindOf(input) == FileKind.Document
+        && !(target.Id == "pdf" && Path.GetExtension(input).TrimStart('.').ToLowerInvariant() is "html" or "htm" or "xhtml" or "txt" or "text");
+
     public static async Task ConvertAsync(string input, string output, TargetFormat target, IHtmlToPdf? htmlToPdf, CancellationToken ct)
     {
         string inExt = Path.GetExtension(input).TrimStart('.').ToLowerInvariant();

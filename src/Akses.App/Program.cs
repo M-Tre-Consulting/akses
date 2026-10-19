@@ -65,7 +65,7 @@ internal static class Program
         // Relative paths only mean something in this process's working directory. Only existing
         // files/folders are paths: "png" after --to is a format, not a file.
         string[] absolute = args.Select(a => File.Exists(a) || Directory.Exists(a) ? Path.GetFullPath(a) : a).ToArray();
-        byte[] payload = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(absolute));
+        byte[] payload = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(absolute, AppJson.Default.StringArray));
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
@@ -97,7 +97,7 @@ internal static class Program
                     using var server = new NamedPipeServerStream(PipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly);
                     server.WaitForConnection();
                     using var reader = new StreamReader(server, Encoding.UTF8);
-                    string[]? args = JsonSerializer.Deserialize<string[]>(reader.ReadToEnd());
+                    string[]? args = JsonSerializer.Deserialize(reader.ReadToEnd(), AppJson.Default.StringArray);
                     if (args is not null) onArgs(args);
                 }
                 catch (Exception ex)

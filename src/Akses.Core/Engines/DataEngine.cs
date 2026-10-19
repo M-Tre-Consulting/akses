@@ -193,7 +193,7 @@ public static class DataEngine
                 string key = i < header.Count && header[i].Length > 0 ? header[i] : $"column{i + 1}";
                 obj[key] = i < row.Count ? Scalar(row[i], true) : null;
             }
-            result.Add(obj);
+            result.Add((JsonNode)obj); // the JsonNode overload: the generic Add<T> isn't trim-safe
         }
         return result;
     }

@@ -35,7 +35,7 @@ la sua pagina: anteprima, informazioni e, sotto, tutte le possibilità.
 | `src/Akses.Core` | i motori, senza interfaccia: `FormatCatalog` (formati letti e in cosa si convertono), `Converter`, `Engines/` (immagini con Magick.NET, audio/video con ffmpeg, PDF con PDFsharp + `Windows.Data.Pdf` + PdfPig, documenti con pandoc, dati in C#) |
 | `src/Akses.App` | l'app WinUI 3: `MainWindow` (una schermata alla volta), `FileView` (la pagina del file), gli strumenti `TrimPage`, `ImagePage`, `PdfPage`, `SettingsPage`, i testi in 5 lingue in `Strings.cs` |
 | `tests/Akses.Core.Tests` | test xUnit: conversioni vere su file generati al volo |
-| `installer/` | `fetch-tools.ps1` (ffmpeg e pandoc con versione e SHA-256 fissati), `build-installer.ps1`, `Akses.iss` (Inno Setup) |
+| `installer/` | `build-ffmpeg.sh` (l'ffmpeg ridotto, da WSL), `fetch-tools.ps1` (pandoc per sviluppare), `build-installer.ps1`, `Akses.iss` (Inno Setup) |
 
 Scelte da sapere:
 
@@ -44,6 +44,16 @@ Scelte da sapere:
   (`Program.cs`).
 - **Documenti → PDF** con WebView2 (il motore di Edge, già in Windows): pandoc scrive l'HTML,
   WebView2 lo stampa in PDF (`WebViewPdfPrinter.cs`). Niente LaTeX da distribuire.
+- **Leggero: installer ~46 MB, installato ~185 MB.** Tre scelte:
+  - **ffmpeg ridotto** (33 MB invece di 183): `installer/build-ffmpeg.sh` lo compila con tutti i
+    decoder (si apre qualsiasi file) ma solo gli encoder, i contenitori e i filtri che Akses usa.
+    Se `MediaEngine.cs` usa un encoder, un formato o un filtro nuovo, va aggiunto lì e ricompilato;
+  - **pandoc su richiesta** (225 MB): non è nell'installer. Alla prima conversione di un documento
+    Akses chiede se scaricarlo, ne controlla lo SHA-256 e lo tiene in `%LOCALAPPDATA%\Akses\tools`
+    (`ToolDownloads.cs`). HTML e testo → PDF non ne hanno bisogno;
+  - **trimming di .NET** in Release, solo sul runtime (`System.*`): il livello WinRT/WinUI resta
+    intero (target `KeepWinRTInteropWhole` nel csproj), perché tagliato si rompe con "Interfaccia
+    non supportata". Dopo ogni modifica che tocca API di Windows, provare la build installata.
 - **Interfaccia costruita in codice** (tranne `MainWindow.xaml`), come `LegalDialog` in
   WinPlay: niente `.xbf` in più da copiare a mano in pubblicazione.
 - **Menu del tasto destro** per utente, senza amministratore
@@ -56,8 +66,9 @@ Serve .NET 9 SDK, Visual Studio 2022 con il workload "Sviluppo di applicazioni d
 (per i target AppxPackage, vedi il commento nel csproj) e, per l'installer, Inno Setup 6.
 
 ```powershell
-powershell -File installer\fetch-tools.ps1          # una volta: ffmpeg e pandoc in tools\
-dotnet test tests\Akses.Core.Tests                  # 40 test, conversioni vere
+wsl -d Arch -u root -- bash installer/build-ffmpeg.sh   # una volta: ffmpeg ridotto in tools\ffmpeg
+powershell -File installer\fetch-tools.ps1              # una volta: pandoc in tools\pandoc (per i test)
+dotnet test tests\Akses.Core.Tests                      # 40 test, conversioni vere
 dotnet build src\Akses.App\Akses.App.csproj -r win-x64
 src\Akses.App\bin\Debug\net9.0-windows10.0.19041.0\win-x64\Akses.exe
 ```

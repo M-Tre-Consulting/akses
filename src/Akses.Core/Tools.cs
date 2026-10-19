@@ -14,6 +14,25 @@ public static class Tools
     public static string Ffprobe => Find("ffprobe.exe");
     public static string Pandoc => Find("pandoc.exe");
 
+    /// <summary>
+    /// Where components downloaded on demand live (pandoc, see <see cref="ToolDownloads"/>):
+    /// %LOCALAPPDATA%\Akses	ools, removed with the rest of the app's data on uninstall.
+    /// </summary>
+    public static string DownloadFolder { get; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Akses", "tools");
+
+    /// <summary>True when <paramref name="exe"/> (e.g. "pandoc.exe") can be found, without throwing.</summary>
+    public static bool IsAvailable(string exe)
+    {
+        lock (Cache)
+        {
+            if (Cache.ContainsKey(exe)) return true;
+            string? found = Locate(exe);
+            if (found is not null) Cache[exe] = found;
+            return found is not null;
+        }
+    }
+
     private static readonly Dictionary<string, string> Cache = new(StringComparer.OrdinalIgnoreCase);
 
     private static string Find(string exe)
@@ -29,10 +48,11 @@ public static class Tools
 
     private static string? Locate(string exe)
     {
-        // Installed: <app>\tools\ffmpeg\ffmpeg.exe. Developer builds: walk up from bin\...\ to the
-        // repo root's tools\ (same layout, filled by fetch-tools.ps1).
+        // Downloaded on demand (pandoc): %LOCALAPPDATA%\Akses\tools\pandoc. Installed:
+        // <app>\tools\ffmpeg\ffmpeg.exe. Developer builds: walk up from bin\...\ to the repo root's
+        // tools\ (same layout, filled by fetch-tools.ps1).
         string sub = exe.StartsWith("pandoc", StringComparison.OrdinalIgnoreCase) ? "pandoc" : "ffmpeg";
-        var candidates = new List<string>();
+        var candidates = new List<string> { Path.Combine(DownloadFolder, sub, exe) };
         DirectoryInfo? dir = new(AppContext.BaseDirectory);
         for (int i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
             candidates.Add(Path.Combine(dir.FullName, "tools", sub, exe));

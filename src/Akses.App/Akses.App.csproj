@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -12,11 +12,11 @@
          the exe's version resource (Properties > Details: "Copyright" is LegalCopyright). The year
          is the build year. installer/build-installer.ps1 reads <Version> from here and hands it to
          the installer, so bump it only here. -->
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Product>Akses</Product>
     <Company>M-Tre Consulting</Company>
     <Authors>M-Tre Consulting</Authors>
-    <Copyright>© $([System.DateTime]::Now.Year) M-Tre Consulting. GNU GPL v3.</Copyright>
+    <Copyright>Â© $([System.DateTime]::Now.Year) M-Tre Consulting. GNU GPL v3.</Copyright>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <UseWinUI>true</UseWinUI>
@@ -46,7 +46,32 @@
        so drop ICU (~27 MB). -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Trim the self-contained .NET runtime down to what the app uses. "partial" only trims
+         assemblies marked trimmable (the framework, the Windows SDK projection), never ours or
+         the libraries that use reflection. JSON uses source generation (AppJson in Settings.cs). -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <!-- No PDB-based stack traces in the installed app: drops Microsoft.DiaSymReader.Native. -->
+    <DebugType>none</DebugType>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- Marked trimmable but they use reflection (YAML serializer on Dictionary/List, WebView2's
+         projection for documents → PDF): keep them whole. Both are small. -->
+    <TrimmerRootAssembly Include="YamlDotNet" />
+    <TrimmerRootAssembly Include="Microsoft.Web.WebView2.Core.Projection" />
+  </ItemGroup>
+
+  <!-- The WinRT interop layer (Windows SDK projection, WinRT.Runtime, WinUI and the Windows App SDK
+       projections) breaks when trimmed in a non-AOT app: "Interface not supported" at runtime as
+       soon as a managed object crosses into WinRT. Keep all of it whole and trim only the .NET
+       runtime libraries (System.*), which is where most of the savings are anyway. -->
+  <Target Name="KeepWinRTInteropWhole" BeforeTargets="PrepareForILLink" Condition="'$(PublishTrimmed)' == 'true'">
+    <ItemGroup>
+      <TrimmerRootAssembly Include="@(ManagedAssemblyToLink->'%(Filename)')"
+                           Condition="$([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Windows')) Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.WinUI')) Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.UI')) Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.InteractiveExperiences')) Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.Web.WebView2')) Or $([System.String]::Copy('%(Filename)').StartsWith('WinRT')) Or $([System.String]::Copy('%(Filename)').Contains('Projection'))" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250108002" />
