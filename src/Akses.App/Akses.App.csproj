@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -16,7 +16,7 @@
     <Product>Akses</Product>
     <Company>M-Tre Consulting</Company>
     <Authors>M-Tre Consulting</Authors>
-    <Copyright>Â© $([System.DateTime]::Now.Year) M-Tre Consulting. GNU GPL v3.</Copyright>
+    <Copyright>© $([System.DateTime]::Now.Year) M-Tre Consulting. GNU GPL v3.</Copyright>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <UseWinUI>true</UseWinUI>
