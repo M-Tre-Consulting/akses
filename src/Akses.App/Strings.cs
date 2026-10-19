@@ -470,7 +470,7 @@ internal static class Strings
         "Diese Datenschutzerklärung ist auch auf unserer Website veröffentlicht:");
 
     public static string OwnerHeading => T("Titolare", "Owner", "Titular", "Titulaire", "Inhaber");
-    public static string OwnerLine => F(T("{0}, Savona, Italia", "{0}, Savona, Italy", "{0}, Savona, Italia", "{0}, Savone, Italie", "{0}, Savona, Italien"), CompanyName);
+    public static string OwnerLine => F(T("{0}, Italia", "{0}, Italy", "{0}, Italia", "{0}, Italie", "{0}, Italien"), CompanyName);
 
     public static string LicenseHeading => T("Licenza", "License", "Licencia", "Licence", "Lizenz");
     public static string[] LicenseParagraphs =>
