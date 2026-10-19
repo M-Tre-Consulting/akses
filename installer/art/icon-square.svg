@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1024" y2="1024">
+      <stop offset="0" stop-color="#FF5A3C"/>
+      <stop offset="1" stop-color="#FFB224"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#bg)"/>
+  <!-- the A: two legs meeting at the apex -->
+  <path d="M512 190 L780 830 L676 830 L512 418 L348 830 L244 830 Z" fill="#FFFFFF"/>
+  <!-- crossbar: a two-way arrow (one format to another), cut out of the legs by a gradient outline -->
+  <path d="M176 628 L312 520 L312 590 L712 590 L712 520 L848 628 L712 736 L712 666 L312 666 L312 736 Z"
+        fill="#FFFFFF" stroke="url(#bg)" stroke-width="30" stroke-linejoin="round" paint-order="stroke"/>
+</svg>

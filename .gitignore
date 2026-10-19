@@ -1,0 +1,22 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Visual Studio
+.vs/
+
+## Test results
+TestResults/
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Third-party command-line tools (ffmpeg, pandoc): downloaded by
+## installer/fetch-tools.ps1 with a pinned version and SHA-256, never committed.
+tools/
+
+## Installer build output (produced by installer/build-installer.ps1)
+installer/output/

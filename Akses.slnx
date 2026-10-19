@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Akses.App/Akses.App.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/Akses.Core/Akses.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Akses.Core.Tests/Akses.Core.Tests.csproj" />
+  </Folder>
+</Solution>

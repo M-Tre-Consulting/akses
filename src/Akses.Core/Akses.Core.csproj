@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Windows TFM: PDF pages are rendered with Windows.Data.Pdf (built into Windows). -->
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Akses.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Images: ~200 formats read (HEIC, AVIF, WebP, RAW, PSD, SVG…), Apache-2.0. Q8 is
+         plenty for photos and half the memory of Q16. -->
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.17.2" />
+    <!-- PDF merge / split / extract / rotate / images → PDF, MIT. -->
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
+    <!-- PDF → text, Apache-2.0. -->
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <!-- YAML for the data converter, MIT. -->
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Akses.Core.Tests" />
+  </ItemGroup>
+
+</Project>

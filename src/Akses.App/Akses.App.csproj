@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Akses.App</RootNamespace>
+    <!-- The exe is what Explorer's "Converti con Akses" menu launches: call it Akses.exe. -->
+    <AssemblyName>Akses</AssemblyName>
+
+    <!-- Version + M-Tre brand metadata (m-tre-site/brand/README.md, section 4): these end up in
+         the exe's version resource (Properties > Details: "Copyright" is LegalCopyright). The year
+         is the build year. installer/build-installer.ps1 reads <Version> from here and hands it to
+         the installer, so bump it only here. -->
+    <Version>1.0.0</Version>
+    <Product>Akses</Product>
+    <Company>M-Tre Consulting</Company>
+    <Authors>M-Tre Consulting</Authors>
+    <Copyright>© $([System.DateTime]::Now.Year) M-Tre Consulting. GNU GPL v3.</Copyright>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <UseWinUI>true</UseWinUI>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Our own Program.Main (single instance that receives files from Explorer) instead of the
+         one the XAML compiler generates: see Program.cs. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+
+    <!-- Unpackaged desktop app: no MSIX, a plain .exe wrapped by the Inno Setup installer. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <!-- Same `dotnet build` gap as WinPlay Mahogany (microsoft/WindowsAppSDK#4889): point the
+         WindowsAppSDK/MRT-Core targets at Visual Studio's AppxPackage tools. Machine-specific:
+         adjust or delete if your Visual Studio edition/path differs. -->
+    <AppxMSBuildToolsPath Condition="'$(AppxMSBuildToolsPath)' == '' AND Exists('C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\')">C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\</AppxMSBuildToolsPath>
+    <Platforms>x64;arm64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+
+    <!-- UI text lives in Strings.cs (five languages, no .resx): satellite resources only carry
+         WinAppSDK internals we never show. -->
+    <SatelliteResourceLanguages>it;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- Release/installer only: no culture-aware formatting beyond explicit InvariantCulture calls,
+       so drop ICU (~27 MB). -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250108002" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Akses.Core\Akses.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embedded in the exe by ApplicationIcon, and copied next to it for AppWindow.SetIcon and
+         the Explorer menu (unpackaged apps don't reliably pick up the embedded one). -->
+    <Content Include="Assets\AppIcon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- M-Tre logo for the signature + "Privacy, licenza e contatti" (transparent, 192 px, from
+         m-tre-site/brand/logo/mtre-logo@3x.png). -->
+    <Content Include="Assets\MTreLogo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- GPLv3: every copy ships with the license text and the attributions. -->
+    <Content Include="..\..\LICENSE" Link="LICENSE">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\NOTICE.md" Link="NOTICE.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,59 @@
+<Window
+    x:Class="Akses.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Akses.App"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Invisible printer for documents → PDF (WebViewPdfPrinter). It needs a real, non-zero
+             size in the tree to initialize, so it sits 1 px wide behind the title bar. -->
+        <WebView2 x:Name="PdfWebView" Grid.Row="0" Width="1" Height="1" Opacity="0" IsHitTestVisible="False"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" />
+
+        <!-- custom title bar -->
+        <Grid x:Name="TitleBarArea" Grid.Row="0">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" Spacing="8">
+                <Image x:Name="TitleIcon" Width="18" Height="18" VerticalAlignment="Center" />
+                <TextBlock Text="Akses" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold" />
+            </StackPanel>
+        </Grid>
+
+        <!-- One screen at a time (MainWindow.Show): home, the file's page, a tool, settings. -->
+        <Grid x:Name="PageHost" Grid.Row="1" />
+
+        <!-- M-Tre signature (brand guide, m-tre-site/brand/README.md section 1): always visible.
+             Logo + name open the company site; the year opens "Privacy, licenza e contatti".
+             Name and year are not localized. -->
+        <Grid Grid.Row="2" Padding="14,2,14,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="BrandSiteButton" Grid.Column="0" Click="OnBrandSiteClicked"
+                    Background="Transparent" BorderThickness="0" Padding="6,4"
+                    ToolTipService.ToolTip="https://mtre-consulting.it">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Image x:Name="BrandLogo" Width="16" Height="16" />
+                    <TextBlock Text="M-Tre Consulting" FontSize="11" FontWeight="Medium"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="BrandLegalButton" Grid.Column="2" Click="OnBrandLegalClicked"
+                    Background="Transparent" BorderThickness="0" Padding="6,4"
+                    ToolTipService.ToolTip="{x:Bind local:Strings.LegalTitle}">
+                <TextBlock Text="{x:Bind local:Strings.CopyrightYear}" FontSize="11" FontWeight="Medium"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Button>
+        </Grid>
+    </Grid>
+</Window>
