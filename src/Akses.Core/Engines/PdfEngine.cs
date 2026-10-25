@@ -4,13 +4,18 @@ using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
+#if WINDOWS
 using Windows.Storage;
 using Windows.Storage.Streams;
 using WinPdf = Windows.Data.Pdf;
+#endif
 
 namespace Akses.Core.Engines;
 
-/// <summary>PDF tools: merge, split, extract and rotate pages (PDFsharp), pages to images (Windows' own PDF renderer), text (PdfPig).</summary>
+/// <summary>
+/// PDF tools: merge, split, extract and rotate pages (PDFsharp), pages to images (Windows' own PDF
+/// renderer; poppler's pdftoppm on Linux), text (PdfPig).
+/// </summary>
 public static class PdfEngine
 {
     public static int PageCount(string pdf)
@@ -106,6 +111,7 @@ public static class PdfEngine
         doc.Save(output);
     }, ct);
 
+#if WINDOWS
     /// <summary>Renders every page to PNG or JPG in <paramref name="outputFolder"/>, at <paramref name="dpi"/>.</summary>
     public static async Task ToImagesAsync(string input, string outputFolder, bool jpg, int dpi, IProgress<double>? progress, CancellationToken ct)
     {
@@ -162,6 +168,48 @@ public static class PdfEngine
         reader.ReadBytes(png);
         return png;
     }
+
+#else
+    /// <summary>Renders every page to PNG or JPG in <paramref name="outputFolder"/>, at <paramref name="dpi"/>.</summary>
+    public static async Task ToImagesAsync(string input, string outputFolder, bool jpg, int dpi, IProgress<double>? progress, CancellationToken ct)
+    {
+        int count = PageCount(input);
+        Directory.CreateDirectory(outputFolder);
+        string name = Path.GetFileNameWithoutExtension(input);
+        int digits = count.ToString().Length;
+
+        for (int i = 1; i <= count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            string target = Path.Combine(outputFolder, $"{name}-{i.ToString().PadLeft(digits, '0')}");
+            // -singlefile: "target.png" / "target.jpg", no page number added by pdftoppm.
+            await Tools.RunAsync(Tools.Pdftoppm,
+                [jpg ? "-jpeg" : "-png", .. (jpg ? new[] { "-jpegopt", "quality=90" } : []), "-r", dpi.ToString(),
+                 "-f", i.ToString(), "-l", i.ToString(), "-singlefile", input, target], ct).ConfigureAwait(false);
+            progress?.Report((double)i / count);
+        }
+    }
+
+    /// <summary>PNG of one page (0-based), <paramref name="width"/> pixels wide: the thumbnail of a PDF.</summary>
+    public static async Task<byte[]> RenderPageAsync(string input, int pageIndex, int width)
+    {
+        int page = Math.Clamp(pageIndex, 0, PageCount(input) - 1) + 1;
+        string prefix = Path.Combine(Path.GetTempPath(), "Akses", "pdf-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.GetDirectoryName(prefix)!);
+        try
+        {
+            await Tools.RunAsync(Tools.Pdftoppm,
+                ["-png", "-f", page.ToString(), "-l", page.ToString(), "-scale-to-x", width.ToString(), "-scale-to-y", "-1",
+                 "-singlefile", input, prefix], CancellationToken.None).ConfigureAwait(false);
+            return await File.ReadAllBytesAsync(prefix + ".png").ConfigureAwait(false);
+        }
+        finally
+        {
+            OutputPaths.TryDelete(prefix + ".png");
+        }
+    }
+
+#endif
 
     /// <summary>The text of every page, in reading order, pages separated by a blank line.</summary>
     public static Task ToTextAsync(string input, string output, CancellationToken ct) => Task.Run(() =>

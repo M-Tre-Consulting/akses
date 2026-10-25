@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=Akses
+GenericName=File converter
+GenericName[it]=Convertitore di file
+GenericName[es]=Conversor de archivos
+GenericName[fr]=Convertisseur de fichiers
+GenericName[de]=Dateikonverter
+Comment=Give it a file: it shows everything you can do with it
+Comment[it]=Dagli un file: ti mostra tutto quello che puoi farci
+Comment[es]=Dale un archivo: te muestra todo lo que puedes hacer con él
+Comment[fr]=Donnez-lui un fichier : il vous montre tout ce que vous pouvez en faire
+Comment[de]=Gib ihm eine Datei: Es zeigt dir alles, was du damit machen kannst
+Exec=akses %F
+Icon=akses
+Terminal=false
+StartupNotify=true
+StartupWMClass=akses
+Categories=Graphics;AudioVideo;Utility;
+Keywords=convert;converter;mkv;mp4;webp;jpg;heic;pdf;trim;crop;resize;video;audio;image;
+Keywords[it]=converti;convertitore;mkv;mp4;webp;jpg;heic;pdf;taglia;ritaglia;ridimensiona;video;audio;immagine;
+MimeType=image/jpeg;image/png;image/apng;image/webp;image/gif;image/bmp;image/tiff;image/heic;image/heif;image/avif;image/jxl;image/jp2;image/x-icon;image/vnd.microsoft.icon;image/svg+xml;image/vnd.adobe.photoshop;image/x-tga;image/x-exr;image/x-portable-pixmap;image/x-portable-graymap;image/x-portable-bitmap;image/x-xcf;image/x-canon-cr2;image/x-canon-cr3;image/x-nikon-nef;image/x-sony-arw;image/x-adobe-dng;image/x-olympus-orf;image/x-panasonic-rw2;image/x-fuji-raf;video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/x-ms-wmv;video/x-flv;video/mpeg;video/mp2t;video/3gpp;video/3gpp2;video/ogg;video/x-m4v;audio/mpeg;audio/mp4;audio/x-m4a;audio/aac;audio/flac;audio/x-flac;audio/ogg;audio/opus;audio/x-wav;audio/wav;audio/x-aiff;audio/x-ms-wma;audio/x-ape;audio/amr;audio/webm;application/pdf;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.oasis.opendocument.text;application/rtf;text/markdown;text/html;application/epub+zip;text/plain;application/json;application/x-yaml;application/xml;text/xml;text/csv;application/x-subrip;text/vtt;text/x-ssa;

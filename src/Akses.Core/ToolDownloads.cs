@@ -1,3 +1,4 @@
+using System.Formats.Tar;
 using System.IO.Compression;
 using System.Security.Cryptography;
 
@@ -7,15 +8,20 @@ namespace Akses.Core;
 /// pandoc (documents) is 225 MB, more than the rest of Akses put together, and only needed by
 /// people who convert Word/Markdown/ePub files. So the installer leaves it out and Akses downloads
 /// the official release the first time it's needed, after asking: pinned version, checked against
-/// its SHA-256 before anything is extracted (same pin as installer/fetch-tools.ps1).
+/// its SHA-256 before anything is extracted (same pin as installer/fetch-tools.ps1). On Linux the
+/// same version, as the official static linux-amd64 build.
 /// </summary>
 public static class ToolDownloads
 {
     public const string PandocVersion = "3.12.1";
-    private const string PandocUrl = "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.zip";
-    private const string PandocSha256 = "6ef431cb20b2c24a0371fc19200dc49d452be54b1b5c9239f3462841ef53e587";
+    private static readonly string PandocUrl = OperatingSystem.IsWindows()
+        ? "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-windows-x86_64.zip"
+        : "https://github.com/jgm/pandoc/releases/download/3.12.1/pandoc-3.12.1-linux-amd64.tar.gz";
+    private static readonly string PandocSha256 = OperatingSystem.IsWindows()
+        ? "6ef431cb20b2c24a0371fc19200dc49d452be54b1b5c9239f3462841ef53e587"
+        : "d0c90410e90204c9ca83b8539fac5c7aed01fd537207e4585849f8abc5df20b8";
     /// <summary>Download size, for the question shown to the user.</summary>
-    public const int PandocDownloadMb = 41;
+    public static int PandocDownloadMb => OperatingSystem.IsWindows() ? 41 : 36;
 
     private static readonly SemaphoreSlim Gate = new(1, 1);
 
@@ -29,7 +35,7 @@ public static class ToolDownloads
         {
             if (PandocInstalled) return;
             string target = Path.Combine(Tools.DownloadFolder, "pandoc");
-            string zip = Path.Combine(Path.GetTempPath(), $"akses-pandoc-{Guid.NewGuid():N}.zip");
+            string zip = Path.Combine(Path.GetTempPath(), $"akses-pandoc-{Guid.NewGuid():N}.download");
             try
             {
                 using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) })
@@ -61,16 +67,33 @@ public static class ToolDownloads
                 string staging = target + ".part";
                 OutputPaths.TryDelete(staging);
                 Directory.CreateDirectory(staging);
-                using (ZipArchive archive = ZipFile.OpenRead(zip))
+                string exe = OperatingSystem.IsWindows() ? "pandoc.exe" : "pandoc";
+                if (OperatingSystem.IsWindows())
                 {
+                    using ZipArchive archive = ZipFile.OpenRead(zip);
                     foreach (ZipArchiveEntry entry in archive.Entries)
                     {
                         string name = Path.GetFileName(entry.FullName);
-                        if (name.Equals("pandoc.exe", StringComparison.OrdinalIgnoreCase) || name.StartsWith("COPY", StringComparison.OrdinalIgnoreCase))
+                        if (name.Equals(exe, StringComparison.OrdinalIgnoreCase) || name.StartsWith("COPY", StringComparison.OrdinalIgnoreCase))
                             entry.ExtractToFile(Path.Combine(staging, name), overwrite: true);
                     }
                 }
-                if (!File.Exists(Path.Combine(staging, "pandoc.exe"))) throw new InvalidDataException("pandoc.exe missing from the download");
+                else
+                {
+                    // pandoc-3.12.1/bin/pandoc: only the program itself.
+                    await using FileStream compressed = File.OpenRead(zip);
+                    await using var gzip = new GZipStream(compressed, CompressionMode.Decompress);
+                    using var tar = new TarReader(gzip);
+                    while (await tar.GetNextEntryAsync(cancellationToken: ct).ConfigureAwait(false) is { } entry)
+                    {
+                        if (entry.EntryType != TarEntryType.RegularFile || entry.Name.Split('/') is not [_, "bin", "pandoc"]) continue;
+                        string unpacked = Path.Combine(staging, exe);
+                        await entry.ExtractToFileAsync(unpacked, overwrite: true, ct).ConfigureAwait(false);
+                        File.SetUnixFileMode(unpacked, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                            | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                    }
+                }
+                if (!File.Exists(Path.Combine(staging, exe))) throw new InvalidDataException("pandoc missing from the download");
                 OutputPaths.TryDelete(target);
                 Directory.Move(staging, target);
                 progress?.Report(1);

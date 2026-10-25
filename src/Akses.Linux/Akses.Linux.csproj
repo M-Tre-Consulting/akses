@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Akses for Linux: the same engine (Akses.Core) and the same texts (Strings.cs, linked from the
+       Windows app) with an Avalonia window instead of WinUI 3. Packaged as a .deb for Linux Mint /
+       Ubuntu / Debian by installer/linux/build-deb.sh; ffmpeg, pdftoppm and VLC come from the
+       system packages the .deb depends on. Builds and runs on Windows too, for quick UI checks. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Akses.App</RootNamespace>
+    <!-- Same name as on Windows: /opt/akses/Akses, linked as /usr/bin/akses. -->
+    <AssemblyName>Akses</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- VideoPlayer copies VLC's frames with Buffer.MemoryCopy. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Linux only ever runs this one; the Windows app has its own manifest and installer. -->
+    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
+
+    <!-- Version: the Windows csproj is the only place it is set (CLAUDE.md, "Fare una release"). -->
+    <Product>Akses</Product>
+    <Company>M-Tre Consulting</Company>
+    <Authors>M-Tre Consulting</Authors>
+    <Copyright>© $([System.DateTime]::Now.Year) M-Tre Consulting. GNU GPL v3.</Copyright>
+    <SatelliteResourceLanguages>it;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- One version for both systems: read <Version> from the Windows app's csproj. -->
+  <PropertyGroup>
+    <_WindowsCsproj>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\Akses.App\Akses.App.csproj'))</_WindowsCsproj>
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($(_WindowsCsproj), '&lt;Version&gt;([^&lt;]+)&lt;/Version&gt;').Groups[1].Value)</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- Reflection inside (YAML serializer, LibVLC's native callbacks): keep them whole. -->
+    <TrimmerRootAssembly Include="YamlDotNet" />
+    <TrimmerRootAssembly Include="LibVLCSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 11.x: LibVLCSharp is built against it. -->
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <!-- Trim preview: plays with the system's libvlc (libvlc5 in the .deb's dependencies). -->
+    <PackageReference Include="LibVLCSharp" Version="3.10.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Akses.Core\Akses.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared with the Windows app, unchanged. -->
+    <Compile Include="..\Akses.App\Strings.cs" Link="Shared\Strings.cs" />
+    <Compile Include="..\Akses.App\Settings.cs" Link="Shared\Settings.cs" />
+    <Compile Include="..\Akses.App\AppLog.cs" Link="Shared\AppLog.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\installer\art\akses-512.png" Link="Assets\akses.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\Akses.App\Assets\MTreLogo.png" Link="Assets\MTreLogo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\LICENSE" Link="LICENSE">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\NOTICE.md" Link="NOTICE.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

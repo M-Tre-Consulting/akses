@@ -12,7 +12,7 @@
          the exe's version resource (Properties > Details: "Copyright" is LegalCopyright). The year
          is the build year. installer/build-installer.ps1 reads <Version> from here and hands it to
          the installer, so bump it only here. -->
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Product>Akses</Product>
     <Company>M-Tre Consulting</Company>
     <Authors>M-Tre Consulting</Authors>

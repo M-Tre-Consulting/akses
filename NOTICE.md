@@ -51,3 +51,20 @@ un documento e accetta, ne controlla lo SHA-256 (`src/Akses.Core/ToolDownloads.c
 | WebView2 (Microsoft Edge) | documenti → PDF | componente di Windows |
 
 Il rendering delle pagine PDF in immagini usa `Windows.Data.Pdf`, che fa parte di Windows.
+
+## Versione per Linux (`src/Akses.Linux`, pacchetto `.deb`)
+
+Stesso motore e stesse librerie .NET qui sopra; cambia il resto:
+
+| Componente | Uso | Licenza | Da dove arriva |
+|---|---|---|---|
+| [Avalonia](https://avaloniaui.net) | interfaccia (al posto di WinUI 3) | MIT | dentro l'app |
+| [LibVLCSharp](https://code.videolan.org/videolan/LibVLCSharp) | anteprima del taglio | LGPL v2.1+ | dentro l'app |
+| [FFmpeg](https://ffmpeg.org) | audio, video, sottotitoli | GPL / LGPL | pacchetto `ffmpeg` della distribuzione |
+| [poppler](https://poppler.freedesktop.org) (`pdftoppm`) | pagine PDF in immagini | GPL v2+ | pacchetto `poppler-utils` |
+| [VLC](https://www.videolan.org) (libvlc) | anteprima del taglio | LGPL v2.1+ | pacchetti `libvlc5`, `vlc-plugin-base` |
+| [LibreOffice](https://www.libreoffice.org) | documenti → PDF (al posto di WebView2) | MPL 2.0 | già sul sistema (pacchetto consigliato) |
+
+FFmpeg, poppler, VLC e LibreOffice non sono nel pacchetto: li installa il gestore dei pacchetti
+della distribuzione, con le loro licenze in `/usr/share/doc`. pandoc si scarica come su Windows
+(build ufficiale `linux-amd64`, stesso controllo SHA-256) in `~/.local/share/Akses/tools/pandoc/`.

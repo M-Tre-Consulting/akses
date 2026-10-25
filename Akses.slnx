@@ -4,6 +4,7 @@
       <Platform Project="x64" />
     </Project>
     <Project Path="src/Akses.Core/Akses.Core.csproj" />
+    <Project Path="src/Akses.Linux/Akses.Linux.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Akses.Core.Tests/Akses.Core.Tests.csproj" />

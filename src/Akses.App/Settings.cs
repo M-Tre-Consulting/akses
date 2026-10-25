@@ -3,8 +3,11 @@ using Akses.Core;
 
 namespace Akses.App;
 
-/// <summary>The few things Akses remembers, in %LOCALAPPDATA%\Akses\settings.json.</summary>
-internal sealed class Settings
+/// <summary>
+/// The few things Akses remembers, in %LOCALAPPDATA%\Akses\settings.json (~/.local/share/Akses on
+/// Linux, where Settings.Linux.cs adds the file manager menu switch).
+/// </summary>
+internal sealed partial class Settings
 {
     public static readonly string DataFolder = CreateDataFolder();
 
@@ -22,7 +25,7 @@ internal sealed class Settings
 
     private static string CreateDataFolder()
     {
-        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Akses");
+        string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Akses");
         try { Directory.CreateDirectory(folder); } catch { }
         return folder;
     }

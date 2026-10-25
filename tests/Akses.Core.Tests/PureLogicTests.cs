@@ -106,4 +106,22 @@ public class OutputPathsTests
             Directory.Delete(dir, true);
         }
     }
+
+    [Fact]
+    public void Jobs_running_together_get_different_names()
+    {
+        // Two conversions that haven't written their file yet ("lettera.docx" and "lettera.html" → PDF).
+        string dir = Directory.CreateTempSubdirectory("akses-test").FullName;
+        try
+        {
+            string a = OutputPaths.Unique(dir, "lettera", "pdf");
+            string b = OutputPaths.Unique(dir, "lettera", "pdf");
+            Assert.NotEqual(a, b);
+            Assert.NotEqual(OutputPaths.UniqueFolder(dir, "pagine"), OutputPaths.UniqueFolder(dir, "pagine"));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
 }

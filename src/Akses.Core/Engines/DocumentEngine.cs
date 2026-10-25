@@ -5,11 +5,15 @@ namespace Akses.Core.Engines;
 
 /// <summary>
 /// Prints an HTML file to PDF. Implemented by the app with WebView2 (Edge's engine, already on every
-/// Windows 10/11 PC), so documents become PDFs without shipping a LaTeX distribution.
+/// Windows 10/11 PC), so documents become PDFs without shipping a LaTeX distribution; on Linux with
+/// LibreOffice, which also lays out Word and OpenDocument files by itself (<see cref="DirectFormats"/>).
 /// </summary>
 public interface IHtmlToPdf
 {
     Task PrintAsync(string htmlPath, string pdfOutput, CancellationToken ct);
+
+    /// <summary>Extensions (lowercase, no dot) <see cref="PrintAsync"/> also takes as they are, without pandoc.</summary>
+    IReadOnlySet<string> DirectFormats => new HashSet<string>();
 }
 
 /// <summary>Text documents through pandoc: Word, OpenDocument, Markdown, HTML, EPUB, RTF… and PDF via <see cref="IHtmlToPdf"/>.</summary>
@@ -35,11 +39,13 @@ public static class DocumentEngine
 
     /// <summary>
     /// True when this conversion goes through pandoc, which Akses downloads on first use
-    /// (<see cref="ToolDownloads"/>). HTML and plain text to PDF only need WebView2.
+    /// (<see cref="ToolDownloads"/>). HTML and plain text to PDF only need WebView2 (on Linux
+    /// LibreOffice, which also takes Word and OpenDocument files directly).
     /// </summary>
     public static bool NeedsPandoc(string input, TargetFormat target) =>
         FormatCatalog.KindOf(input) == FileKind.Document
-        && !(target.Id == "pdf" && Path.GetExtension(input).TrimStart('.').ToLowerInvariant() is "html" or "htm" or "xhtml" or "txt" or "text");
+        && !(target.Id == "pdf" && Path.GetExtension(input).TrimStart('.').ToLowerInvariant() is var ext
+             && (ext is "html" or "htm" or "xhtml" or "txt" or "text" || Converter.HtmlToPdf?.DirectFormats.Contains(ext) == true));
 
     public static async Task ConvertAsync(string input, string output, TargetFormat target, IHtmlToPdf? htmlToPdf, CancellationToken ct)
     {
@@ -49,7 +55,7 @@ public static class DocumentEngine
         if (target.Id == "pdf")
         {
             if (htmlToPdf is null) throw new NotSupportedException("PDF printing is not available");
-            if (inExt is "html" or "htm" or "xhtml")
+            if (inExt is "html" or "htm" or "xhtml" || htmlToPdf.DirectFormats.Contains(inExt))
             {
                 await htmlToPdf.PrintAsync(input, output, ct).ConfigureAwait(false);
                 return;

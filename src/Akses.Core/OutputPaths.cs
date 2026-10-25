@@ -11,19 +11,36 @@ public static class OutputPaths
     public static string Unique(string folder, string baseName, string extension, string suffix = "")
     {
         extension = extension.TrimStart('.');
-        string candidate = Path.Combine(folder, $"{baseName}{suffix}.{extension}");
-        for (int i = 1; File.Exists(candidate) || Directory.Exists(candidate); i++)
-            candidate = Path.Combine(folder, $"{baseName}{suffix} ({i}).{extension}");
-        return candidate;
+        lock (Handed)
+        {
+            string candidate = Path.Combine(folder, $"{baseName}{suffix}.{extension}");
+            for (int i = 1; Taken(candidate); i++)
+                candidate = Path.Combine(folder, $"{baseName}{suffix} ({i}).{extension}");
+            Handed.Add(candidate);
+            return candidate;
+        }
     }
+
+    /// <summary>
+    /// Every name handed out in this session. Jobs run side by side and only write their file at the
+    /// end: without this, "lettera.docx" and "lettera.html" → PDF would both get "lettera.pdf" and the
+    /// second would overwrite the first.
+    /// </summary>
+    private static readonly HashSet<string> Handed = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+
+    private static bool Taken(string path) => Handed.Contains(path) || File.Exists(path) || Directory.Exists(path);
 
     /// <summary>A folder name in <paramref name="parent"/> that doesn't exist yet (for multi-file results such as PDF pages).</summary>
     public static string UniqueFolder(string parent, string name)
     {
-        string candidate = Path.Combine(parent, name);
-        for (int i = 1; Directory.Exists(candidate) || File.Exists(candidate); i++)
-            candidate = Path.Combine(parent, $"{name} ({i})");
-        return candidate;
+        lock (Handed)
+        {
+            string candidate = Path.Combine(parent, name);
+            for (int i = 1; Taken(candidate); i++)
+                candidate = Path.Combine(parent, $"{name} ({i})");
+            Handed.Add(candidate);
+            return candidate;
+        }
     }
 
     /// <summary>

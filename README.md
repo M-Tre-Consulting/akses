@@ -1,7 +1,8 @@
 # Akses
 
-**Dagli un file: ti mostra tutto quello che puoi farci.** App nativa per Windows (WinUI 3) di
-M-Tre Consulting, gratis e software libero.
+**Dagli un file: ti mostra tutto quello che puoi farci.** App nativa per Windows (WinUI 3) e per
+Linux (Avalonia, pacchetto `.deb` per Linux Mint, Ubuntu e Debian) di M-Tre Consulting, gratis e
+software libero.
 
 Trascini un file nella finestra, o fai clic destro in Esplora file → **Apri con Akses**, e si apre
 la sua pagina: anteprima, informazioni e, sotto, tutte le possibilità.
@@ -32,10 +33,11 @@ la sua pagina: anteprima, informazioni e, sotto, tutte le possibilità.
 
 | Cartella | Cosa c'è |
 |---|---|
-| `src/Akses.Core` | i motori, senza interfaccia: `FormatCatalog` (formati letti e in cosa si convertono), `Converter`, `Engines/` (immagini con Magick.NET, audio/video con ffmpeg, PDF con PDFsharp + `Windows.Data.Pdf` + PdfPig, documenti con pandoc, dati in C#) |
+| `src/Akses.Core` | i motori, senza interfaccia: `FormatCatalog` (formati letti e in cosa si convertono), `Converter`, `Engines/` (immagini con Magick.NET, audio/video con ffmpeg, PDF con PDFsharp + `Windows.Data.Pdf` (su Linux `pdftoppm`) + PdfPig, documenti con pandoc, dati in C#). Compila sia per Windows sia per `net9.0` (Linux) |
 | `src/Akses.App` | l'app WinUI 3: `MainWindow` (una schermata alla volta), `FileView` (la pagina del file), gli strumenti `TrimPage`, `ImagePage`, `PdfPage`, `SettingsPage`, i testi in 5 lingue in `Strings.cs` |
+| `src/Akses.Linux` | l'app per Linux, in Avalonia: le stesse pagine con gli stessi nomi, rifatte senza WinUI. `Strings.cs`, `Settings.cs` e `AppLog.cs` sono quelli dell'app Windows (collegati, non copiati) |
 | `tests/Akses.Core.Tests` | test xUnit: conversioni vere su file generati al volo |
-| `installer/` | `build-ffmpeg.sh` (l'ffmpeg ridotto, da WSL), `fetch-tools.ps1` (pandoc per sviluppare), `build-installer.ps1`, `Akses.iss` (Inno Setup) |
+| `installer/` | `build-ffmpeg.sh` (l'ffmpeg ridotto, da WSL), `fetch-tools.ps1` (pandoc per sviluppare), `build-installer.ps1`, `Akses.iss` (Inno Setup); per Linux `build-linux.ps1` e `linux/` (`build-deb.sh`, `akses.desktop`) |
 
 Scelte da sapere:
 
@@ -60,6 +62,26 @@ Scelte da sapere:
   (`HKCU\Software\Classes\SystemFileAssociations\.ext\shell\Akses`); su Windows 11 è in
   "Mostra altre opzioni".
 
+### La versione per Linux
+
+Stesso motore e stessi testi, interfaccia rifatta in Avalonia (WinUI esiste solo su Windows). Le
+differenze, tutte in `src/Akses.Linux`:
+
+- **Niente ffmpeg ridotto né installer da 46 MB**: il `.deb` (~26 MB) dipende dai pacchetti della
+  distribuzione, `ffmpeg`, `poppler-utils` (le pagine PDF in immagini, al posto di
+  `Windows.Data.Pdf`) e `libvlc5` (l'anteprima del taglio, al posto del MediaPlayer di Windows: VLC
+  disegna i fotogrammi in una bitmap della finestra, `VideoPlayer.cs`). apt li installa da solo.
+- **Documenti → PDF con LibreOffice** (`LibreOfficePdfPrinter.cs`), già presente su Mint e Ubuntu:
+  stampa l'HTML di pandoc e apre direttamente Word/OpenDocument/RTF, quindi per questi non serve
+  pandoc. Usa un profilo suo, così funziona anche con LibreOffice aperto.
+- **«Apri con Akses»** nel clic destro di Nemo (il gestore dei file di Mint): un file
+  `~/.local/share/nemo/actions/akses.nemo_action`, scritto dall'app al primo avvio (un pacchetto
+  non può scrivere nelle home) e tolto dall'interruttore in Impostazioni. Negli altri gestori di
+  file Akses compare in «Apri con» grazie al `.desktop`.
+- **Una sola finestra**: un lock esclusivo su `~/.local/share/Akses/instance.lock` decide chi è il
+  primo, gli altri passano i file su una named pipe (un socket locale) come su Windows.
+- **Icone disegnate come tracciati** (`Glyph.cs`): Segoe Fluent Icons non c'è.
+
 ## Compilare
 
 Serve .NET 9 SDK, Visual Studio 2022 con il workload "Sviluppo di applicazioni desktop .NET"
@@ -74,13 +96,22 @@ src\Akses.App\bin\Debug\net9.0-windows10.0.19041.0\win-x64\Akses.exe
 ```
 
 Installer: `powershell -File installer\build-installer.ps1` → `installer\output\Akses-Setup-<versione>.exe`.
-La versione si cambia solo in `<Version>` di `src/Akses.App/Akses.App.csproj`.
+La versione si cambia solo in `<Version>` di `src/Akses.App/Akses.App.csproj` (anche l'app Linux la
+legge da lì).
+
+Linux: `powershell -File installer\build-linux.ps1` → `installer\output\akses_<versione>_amd64.deb`.
+Pubblica l'app per `linux-x64` da Windows (niente di nativo da compilare) e la impacchetta in WSL con
+`dpkg-deb` (`pacman -S dpkg` su Arch). Per provarla al volo senza pacchetto, in WSL con WSLg e i
+pacchetti `ffmpeg poppler vlc libice libsm`: `dotnet publish src\Akses.Linux -c Release -r linux-x64
+--self-contained` e lancia `Akses` dalla cartella `publish`. Su Ubuntu la libreria di VLC si chiama
+solo `libvlc.so.5`: `VideoPlayer.cs` la cerca con quel nome.
 
 ## Pubblicazione
 
 Come WinPlay Mahogany, l'installer si scarica dalla pagina dell'app sul sito
-(<https://mtre-consulting.it/progetti/akses>) insieme allo zip del sorgente della stessa
-versione, presi dall'ultima release GitHub di questa repo. Le decisioni (licenza, prezzo, firma)
+(<https://mtre-consulting.it/progetti/akses>), preso dall'ultima release GitHub di questa repo: la
+pagina offre l'`.exe` a chi arriva da Windows e il `.deb` a chi arriva da Linux, con l'altro a un
+link di distanza. Le decisioni (licenza, prezzo, firma)
 sono nella scheda di Akses in `m-tre-site/brand/DISTRIBUZIONE.md`.
 
 ## Licenza

@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Windows TFM: PDF pages are rendered with Windows.Data.Pdf (built into Windows). -->
-    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <!-- Windows TFM: PDF pages are rendered with Windows.Data.Pdf (built into Windows). The plain
+         net9.0 one is for the Linux app (src/Akses.Linux), which renders them with pdftoppm. -->
+    <TargetFrameworks>net9.0-windows10.0.19041.0;net9.0</TargetFrameworks>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

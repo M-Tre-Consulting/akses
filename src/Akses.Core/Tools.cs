@@ -4,22 +4,26 @@ using System.Text;
 namespace Akses.Core;
 
 /// <summary>
-/// The command-line tools Akses drives (ffmpeg, ffprobe, pandoc). The installer ships them in
-/// <c>tools\</c> next to the exe (installer/fetch-tools.ps1 downloads pinned builds); a developer
-/// build also finds them in the repo's <c>tools\</c> folder or on PATH.
+/// The command-line tools Akses drives (ffmpeg, ffprobe, pandoc; on Linux also pdftoppm). The
+/// Windows installer ships them in <c>tools\</c> next to the exe (installer/fetch-tools.ps1 downloads
+/// pinned builds); a developer build also finds them in the repo's <c>tools\</c> folder or on PATH.
+/// On Linux the names are the same without ".exe" and ffmpeg and pdftoppm come from the system
+/// packages the .deb depends on (installer/linux/build-deb.sh).
 /// </summary>
 public static class Tools
 {
     public static string Ffmpeg => Find("ffmpeg.exe");
     public static string Ffprobe => Find("ffprobe.exe");
     public static string Pandoc => Find("pandoc.exe");
+    /// <summary>Renders PDF pages on Linux (poppler-utils), where Windows.Data.Pdf doesn't exist.</summary>
+    public static string Pdftoppm => Find("pdftoppm.exe");
 
     /// <summary>
     /// Where components downloaded on demand live (pandoc, see <see cref="ToolDownloads"/>):
     /// %LOCALAPPDATA%\Akses	ools, removed with the rest of the app's data on uninstall.
     /// </summary>
     public static string DownloadFolder { get; } =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Akses", "tools");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Akses", "tools");
 
     /// <summary>True when <paramref name="exe"/> (e.g. "pandoc.exe") can be found, without throwing.</summary>
     public static bool IsAvailable(string exe)
@@ -48,6 +52,7 @@ public static class Tools
 
     private static string? Locate(string exe)
     {
+        if (!OperatingSystem.IsWindows()) exe = Path.GetFileNameWithoutExtension(exe);
         // Downloaded on demand (pandoc): %LOCALAPPDATA%\Akses\tools\pandoc. Installed:
         // <app>\tools\ffmpeg\ffmpeg.exe. Developer builds: walk up from bin\...\ to the repo root's
         // tools\ (same layout, filled by fetch-tools.ps1).
@@ -57,8 +62,11 @@ public static class Tools
         for (int i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
             candidates.Add(Path.Combine(dir.FullName, "tools", sub, exe));
 
-        foreach (string folder in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
-            candidates.Add(Path.Combine(folder.Trim(), exe));
+        // Not pandoc on Linux: the distributions' own is often too old for --embed-resources (Mint
+        // 21 has 2.9), so Akses always uses the pinned one it downloads.
+        if (OperatingSystem.IsWindows() || sub != "pandoc")
+            foreach (string folder in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+                candidates.Add(Path.Combine(folder.Trim(), exe));
 
         return candidates.FirstOrDefault(File.Exists);
     }

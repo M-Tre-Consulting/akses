@@ -7,8 +7,9 @@ namespace Akses.App;
 
 /// <summary>
 /// Every user-visible string in the app, in the five languages the M-Tre brand guide requires
-/// (it, en, es, fr, de), picked from the Windows display language; any other language falls back
-/// to English.
+/// (it, en, es, fr, de), picked from the Windows display language (on Linux from LANGUAGE / LANG);
+/// any other language falls back to English. Shared with the Linux app (src/Akses.Linux), which
+/// compiles this same file: the few texts that name Windows have a Linux variant (<see cref="Linux"/>).
 ///
 /// Deliberately not .resx/.resw (same as WinPlay Mahogany): Release builds run with
 /// InvariantGlobalization, where satellite-assembly lookup can't pick a language. The display
@@ -26,6 +27,18 @@ internal static class Strings
         string? forced = Environment.GetEnvironmentVariable("AKSES_LANG");
         if (!string.IsNullOrWhiteSpace(forced))
             return Normalize(forced.Trim().ToLowerInvariant());
+
+        if (!OperatingSystem.IsWindows())
+        {
+            // "it_IT.UTF-8", or LANGUAGE's "it:en" list: the first real one wins.
+            foreach (string name in new[] { "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG" })
+            {
+                string value = (Environment.GetEnvironmentVariable(name) ?? "").Split(':')[0].Trim().ToLowerInvariant();
+                if (value.Length >= 2 && value is not ("c" or "posix") && !value.StartsWith("c.", StringComparison.Ordinal))
+                    return Normalize(value);
+            }
+            return "en";
+        }
 
         try
         {
@@ -55,6 +68,9 @@ internal static class Strings
         "de" => de,
         _ => en,
     };
+
+    /// <summary>The Linux app (src/Akses.Linux): no Explorer, no registry, other folders.</summary>
+    public static bool Linux => OperatingSystem.IsLinux();
 
     private static string F(string format, params object[] args) => string.Format(CultureInfo.InvariantCulture, format, args);
 
@@ -161,7 +177,12 @@ internal static class Strings
         "Einige Akses-Komponenten fehlen: Installiere es neu von mtre-consulting.it.");
     public static string NoAudioTrack => T("Questo file non ha una traccia audio.", "This file has no audio track.", "Este archivo no tiene pista de audio.", "Ce fichier n'a pas de piste audio.", "Diese Datei hat keine Tonspur.");
     public static string NoVideoTrack => T("Questo file non ha immagini video.", "This file has no video.", "Este archivo no tiene vídeo.", "Ce fichier ne contient pas de vidéo.", "Diese Datei enthält kein Video.");
-    public static string AccessDenied => T(
+    public static string AccessDenied => Linux ? T(
+        "Non hai il permesso di scrivere in quella cartella: scegline un'altra in Impostazioni.",
+        "You don't have permission to write to that folder: choose another one in Settings.",
+        "No tienes permiso para escribir en esa carpeta: elige otra en Configuración.",
+        "Vous n'avez pas l'autorisation d'écrire dans ce dossier : choisissez-en un autre dans Paramètres.",
+        "Du darfst in diesen Ordner nicht schreiben: Wähle in den Einstellungen einen anderen.") : T(
         "Windows non permette di scrivere in quella cartella: scegline un'altra in Impostazioni.",
         "Windows doesn't allow writing to that folder: choose another one in Settings.",
         "Windows no permite escribir en esa carpeta: elige otra en Configuración.",
@@ -170,11 +191,22 @@ internal static class Strings
     public static string FileInUse => T("Il file è aperto in un altro programma: chiudilo e riprova.", "The file is open in another program: close it and try again.", "El archivo está abierto en otro programa: ciérralo e inténtalo de nuevo.", "Le fichier est ouvert dans un autre programme : fermez-le et réessayez.", "Die Datei ist in einem anderen Programm geöffnet: Schließe es und versuche es erneut.");
     public static string CannotRead => T("Il file sembra danneggiato o in un formato non valido.", "The file looks damaged or isn't valid.", "El archivo parece dañado o no es válido.", "Le fichier semble endommagé ou invalide.", "Die Datei scheint beschädigt oder ungültig zu sein.");
     public static string PdfProtected => T("Questo PDF è protetto da password o danneggiato.", "This PDF is password-protected or damaged.", "Este PDF está protegido con contraseña o dañado.", "Ce PDF est protégé par un mot de passe ou endommagé.", "Dieses PDF ist passwortgeschützt oder beschädigt.");
+    public static string LibreOfficeMissing => T(
+        "Per trasformare i documenti in PDF serve LibreOffice: installalo da Gestione applicazioni e riprova.",
+        "Turning documents into PDF needs LibreOffice: install it from the Software Manager and try again.",
+        "Para convertir documentos a PDF hace falta LibreOffice: instálalo desde el gestor de aplicaciones e inténtalo de nuevo.",
+        "Pour transformer des documents en PDF, il faut LibreOffice : installez-le depuis le gestionnaire de logiciels et réessayez.",
+        "Um Dokumente in PDF umzuwandeln, braucht es LibreOffice: Installiere es über die Anwendungsverwaltung und versuche es erneut.");
     public static string Failed(string detail) => F(T("Non riuscito: {0}", "Failed: {0}", "No se ha podido: {0}", "Échec : {0}", "Fehlgeschlagen: {0}"), detail);
 
     // ---- convert ---------------------------------------------------------------------------
 
-    public static string ConvertDropSubtitle(int formats) => F(T(
+    public static string ConvertDropSubtitle(int formats) => F(Linux ? T(
+        "Oltre {0} formati: WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON e tanti altri. Oppure, nel gestore dei file, clic destro su un file → «Apri con Akses».",
+        "Over {0} formats: WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON and many more. Or, in the file manager, right-click a file → \"Open with Akses\".",
+        "Más de {0} formatos: WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON y muchos más. O, en el gestor de archivos, clic derecho en un archivo → «Abrir con Akses».",
+        "Plus de {0} formats : WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON et bien d'autres. Ou, dans le gestionnaire de fichiers, clic droit sur un fichier → « Ouvrir avec Akses ».",
+        "Über {0} Formate: WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON und viele mehr. Oder im Dateimanager: Rechtsklick auf eine Datei → „Mit Akses öffnen“.") : T(
         "Oltre {0} formati: WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON e tanti altri. Oppure, in Esplora file, clic destro su un file → «Apri con Akses».",
         "Over {0} formats: WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON and many more. Or, in File Explorer, right-click a file → \"Open with Akses\".",
         "Más de {0} formatos: WEBP, HEIC, PNG, JPG, MP4, MKV, MOV, MP3, WAV, FLAC, PDF, DOCX, Markdown, JSON y muchos más. O, en el Explorador, clic derecho en un archivo → «Abrir con Akses».",
@@ -295,7 +327,12 @@ internal static class Strings
     public static string Cutting => T("Taglio in corso…", "Cutting…", "Recortando…", "Coupe en cours…", "Wird geschnitten…");
     public static string NothingToCut => T("Sposta prima le maniglie: ora la selezione è tutto il file.", "Move the handles first: right now the selection is the whole file.", "Mueve primero los controles: ahora la selección es todo el archivo.", "Déplacez d'abord les poignées : la sélection couvre tout le fichier.", "Verschiebe zuerst die Griffe: Im Moment ist die ganze Datei ausgewählt.");
     public static string TrimSuffix => T(" (tagliato)", " (trimmed)", " (recortado)", " (coupé)", " (geschnitten)");
-    public static string NoAudioPreview => T(
+    public static string NoAudioPreview => Linux ? T(
+        "Questo formato non si può ascoltare qui, ma tagliarlo funziona lo stesso.",
+        "This format can't be played here, but trimming it still works.",
+        "Este formato no se puede reproducir aquí, pero recortarlo funciona igual.",
+        "Ce format ne peut pas être lu ici, mais la coupe fonctionne quand même.",
+        "Dieses Format kann hier nicht abgespielt werden, das Schneiden funktioniert trotzdem.") : T(
         "Windows non sa riprodurre questo formato, ma tagliarlo funziona lo stesso.",
         "Windows can't play this format, but trimming it still works.",
         "Windows no puede reproducir este formato, pero recortarlo funciona igual.",
@@ -407,12 +444,19 @@ internal static class Strings
     // ---- settings --------------------------------------------------------------------------
 
     public static string SettingsTitle => T("Impostazioni", "Settings", "Configuración", "Paramètres", "Einstellungen");
-    public static string SettingsSubtitle => T("Dove finiscono i file e come trovare Akses in Esplora file.", "Where your files go and how to reach Akses from File Explorer.", "Dónde van los archivos y cómo usar Akses desde el Explorador.", "Où vont les fichiers et comment utiliser Akses depuis l'Explorateur.", "Wohin die Dateien kommen und wie du Akses im Explorer findest.");
+    public static string SettingsSubtitle => Linux
+        ? T("Dove finiscono i file e come trovare Akses nel gestore dei file.", "Where your files go and how to reach Akses from the file manager.", "Dónde van los archivos y cómo usar Akses desde el gestor de archivos.", "Où vont les fichiers et comment utiliser Akses depuis le gestionnaire de fichiers.", "Wohin die Dateien kommen und wie du Akses im Dateimanager findest.")
+        : T("Dove finiscono i file e come trovare Akses in Esplora file.", "Where your files go and how to reach Akses from File Explorer.", "Dónde van los archivos y cómo usar Akses desde el Explorador.", "Où vont les fichiers et comment utiliser Akses depuis l'Explorateur.", "Wohin die Dateien kommen und wie du Akses im Explorer findest.");
     public static string WhereToSave => T("Dove salvare i file", "Where to save files", "Dónde guardar los archivos", "Où enregistrer les fichiers", "Speicherort");
     public static string SaveInFolder => T("Sempre nella stessa cartella", "Always in the same folder", "Siempre en la misma carpeta", "Toujours dans le même dossier", "Immer im selben Ordner");
     public static string NextToOriginalHint => T("Il nuovo file compare accanto all'originale, che non viene mai toccato.", "The new file appears next to the original, which is never touched.", "El archivo nuevo aparece junto al original, que nunca se toca.", "Le nouveau fichier apparaît à côté de l'original, qui n'est jamais modifié.", "Die neue Datei erscheint neben dem Original, das nie verändert wird.");
     public static string ExplorerMenu => T("Menu del tasto destro", "Right-click menu", "Menú del clic derecho", "Menu du clic droit", "Kontextmenü");
-    public static string ExplorerMenuHint => T(
+    public static string ExplorerMenuHint => Linux ? T(
+        "Fai clic destro su un file nel gestore dei file (Nemo, su Linux Mint) e scegli «Apri con Akses»: si apre la sua pagina con tutto quello che puoi farci. Negli altri gestori di file Akses è in «Apri con».",
+        "Right-click a file in the file manager (Nemo, on Linux Mint) and choose \"Open with Akses\": its page opens with everything you can do with it. In other file managers Akses is under \"Open With\".",
+        "Haz clic derecho en un archivo en el gestor de archivos (Nemo, en Linux Mint) y elige «Abrir con Akses»: se abre su página con todo lo que puedes hacer con él. En otros gestores Akses está en «Abrir con».",
+        "Faites un clic droit sur un fichier dans le gestionnaire de fichiers (Nemo, sous Linux Mint) et choisissez « Ouvrir avec Akses » : sa page s'ouvre avec tout ce que vous pouvez en faire. Dans les autres gestionnaires, Akses est dans « Ouvrir avec ».",
+        "Klicke im Dateimanager (Nemo, unter Linux Mint) mit der rechten Maustaste auf eine Datei und wähle „Mit Akses öffnen“: Ihre Seite öffnet sich mit allem, was du damit machen kannst. In anderen Dateimanagern findest du Akses unter „Öffnen mit“.") : T(
         "Fai clic destro su un file in Esplora file e scegli «Apri con Akses»: si apre la sua pagina con tutto quello che puoi farci. Su Windows 11 la voce è in «Mostra altre opzioni».",
         "Right-click a file in File Explorer and choose \"Open with Akses\": its page opens with everything you can do with it. On Windows 11 it's under \"Show more options\".",
         "Haz clic derecho en un archivo en el Explorador y elige «Abrir con Akses»: se abre su página con todo lo que puedes hacer con él. En Windows 11 está en «Mostrar más opciones».",
@@ -438,13 +482,9 @@ internal static class Strings
         "© {0} M-Tre Consulting. Veröffentlicht unter der GNU GPL v3."), Year);
 
     public static string PrivacyHeading => T("Informativa sulla privacy", "Privacy policy", "Política de privacidad", "Politique de confidentialité", "Datenschutzerklärung");
-    public static string[] PrivacyParagraphs =>
+    public static string[] PrivacyParagraphs => Linux ? LinuxPrivacyParagraphs :
     [
-        T("Akses non raccoglie dati personali e non ne invia a noi né ad altri: niente account, server, pubblicità, statistiche o tracciamento. Tutte le conversioni avvengono sul tuo PC e i tuoi file non vengono mai caricati da nessuna parte.",
-          "Akses collects no personal data and sends none to us or to anyone else: no accounts, servers, ads, analytics or tracking. Every conversion happens on your PC and your files are never uploaded anywhere.",
-          "Akses no recoge datos personales ni los envía a nosotros ni a terceros: sin cuentas, servidores, publicidad, estadísticas ni seguimiento. Todas las conversiones se hacen en tu PC y tus archivos nunca se suben a ningún sitio.",
-          "Akses ne collecte aucune donnée personnelle et n'en envoie ni à nous ni à des tiers : pas de compte, de serveur, de publicité, de statistiques ni de suivi. Toutes les conversions ont lieu sur votre PC et vos fichiers ne sont jamais envoyés nulle part.",
-          "Akses erhebt keine personenbezogenen Daten und sendet keine an uns oder Dritte: keine Konten, Server, Werbung, Statistiken oder Tracking. Alle Konvertierungen laufen auf deinem PC, und deine Dateien werden nirgendwohin hochgeladen."),
+        PrivacyNoData,
         T("L'app legge solo i file che scegli, trascini o apri dal menu di Esplora file, e scrive i risultati accanto all'originale o nella cartella che indichi. Si collega a internet solo in due casi. La prima volta che converti un documento (Word, Markdown, ePub…), dopo avertelo chiesto, scarica da GitHub il componente pandoc: GitHub riceve la richiesta del tuo PC, come quando scarichi un file dal browser. E se un documento che converti contiene immagini prese da un indirizzo web, per inserirle nel PDF o nell'HTML queste vengono scaricate da quell'indirizzo, come farebbe un browser.",
           "The app only reads the files you choose, drop or open from the File Explorer menu, and writes the results next to the original or to the folder you set. It connects to the internet in two cases only. The first time you convert a document (Word, Markdown, ePub…), after asking you, it downloads the pandoc component from GitHub: GitHub receives your PC's request, as when you download a file in the browser. And if a document you convert contains images from a web address, they are downloaded from that address to put them in the PDF or HTML, as a browser would.",
           "La app solo lee los archivos que eliges, arrastras o abres desde el menú del Explorador, y escribe los resultados junto al original o en la carpeta que indiques. Solo se conecta a internet en dos casos. La primera vez que conviertes un documento (Word, Markdown, ePub…), después de preguntarte, descarga de GitHub el componente pandoc: GitHub recibe la solicitud de tu PC, como cuando descargas un archivo en el navegador. Y si un documento que conviertes contiene imágenes de una dirección web, se descargan de esa dirección para ponerlas en el PDF o el HTML, como haría un navegador.",
@@ -462,6 +502,33 @@ internal static class Strings
             "Du kannst Auskunft verlangen und deine Rechte nach der DSGVO (EU-Verordnung 2016/679) ausüben, indem du an {0} schreibst. Da wir deine Daten nie erhalten, genügt es, die App zu deinstallieren: Die Deinstallation entfernt auch die oben genannten Daten. Die konvertierten Dateien bleiben deine, dort, wo du sie gespeichert hast."), CompanyEmail),
     ];
 
+    private static string PrivacyNoData =>
+        T("Akses non raccoglie dati personali e non ne invia a noi né ad altri: niente account, server, pubblicità, statistiche o tracciamento. Tutte le conversioni avvengono sul tuo PC e i tuoi file non vengono mai caricati da nessuna parte.",
+          "Akses collects no personal data and sends none to us or to anyone else: no accounts, servers, ads, analytics or tracking. Every conversion happens on your PC and your files are never uploaded anywhere.",
+          "Akses no recoge datos personales ni los envía a nosotros ni a terceros: sin cuentas, servidores, publicidad, estadísticas ni seguimiento. Todas las conversiones se hacen en tu PC y tus archivos nunca se suben a ningún sitio.",
+          "Akses ne collecte aucune donnée personnelle et n'en envoie ni à nous ni à des tiers : pas de compte, de serveur, de publicité, de statistiques ni de suivi. Toutes les conversions ont lieu sur votre PC et vos fichiers ne sont jamais envoyés nulle part.",
+          "Akses erhebt keine personenbezogenen Daten und sendet keine an uns oder Dritte: keine Konten, Server, Werbung, Statistiken oder Tracking. Alle Konvertierungen laufen auf deinem PC, und deine Dateien werden nirgendwohin hochgeladen.");
+
+    private static string[] LinuxPrivacyParagraphs =>
+    [
+        PrivacyNoData,
+        T("L'app legge solo i file che scegli, trascini o apri dal menu del gestore dei file, e scrive i risultati accanto all'originale o nella cartella che indichi. Si collega a internet solo in due casi. La prima volta che converti un documento (Word, Markdown, ePub…), dopo avertelo chiesto, scarica da GitHub il componente pandoc: GitHub riceve la richiesta del tuo PC, come quando scarichi un file dal browser. E se un documento che converti contiene immagini prese da un indirizzo web, per inserirle nel PDF o nell'HTML queste vengono scaricate da quell'indirizzo, come farebbe un browser.",
+          "The app only reads the files you choose, drop or open from the file manager's menu, and writes the results next to the original or to the folder you set. It connects to the internet in two cases only. The first time you convert a document (Word, Markdown, ePub…), after asking you, it downloads the pandoc component from GitHub: GitHub receives your PC's request, as when you download a file in the browser. And if a document you convert contains images from a web address, they are downloaded from that address to put them in the PDF or HTML, as a browser would.",
+          "La app solo lee los archivos que eliges, arrastras o abres desde el menú del gestor de archivos, y escribe los resultados junto al original o en la carpeta que indiques. Solo se conecta a internet en dos casos. La primera vez que conviertes un documento (Word, Markdown, ePub…), después de preguntarte, descarga de GitHub el componente pandoc: GitHub recibe la solicitud de tu PC, como cuando descargas un archivo en el navegador. Y si un documento que conviertes contiene imágenes de una dirección web, se descargan de esa dirección para ponerlas en el PDF o el HTML, como haría un navegador.",
+          "L'app lit uniquement les fichiers que vous choisissez, déposez ou ouvrez depuis le menu du gestionnaire de fichiers, et écrit les résultats à côté de l'original ou dans le dossier indiqué. Elle ne se connecte à Internet que dans deux cas. La première fois que vous convertissez un document (Word, Markdown, ePub…), après vous l'avoir demandé, elle télécharge depuis GitHub le composant pandoc : GitHub reçoit la requête de votre PC, comme lorsque vous téléchargez un fichier dans le navigateur. Et si un document converti contient des images provenant d'une adresse web, elles sont téléchargées depuis cette adresse pour les insérer dans le PDF ou le HTML, comme le ferait un navigateur.",
+          "Die App liest nur die Dateien, die du auswählst, hineinziehst oder über das Menü des Dateimanagers öffnest, und schreibt die Ergebnisse neben das Original oder in den gewählten Ordner. Sie verbindet sich nur in zwei Fällen mit dem Internet. Wenn du zum ersten Mal ein Dokument konvertierst (Word, Markdown, ePub…), lädt sie nach Rückfrage die Komponente pandoc von GitHub herunter: GitHub erhält die Anfrage deines PCs, wie beim Herunterladen einer Datei im Browser. Und enthält ein Dokument, das du konvertierst, Bilder von einer Webadresse, werden sie von dort heruntergeladen, um sie ins PDF oder HTML einzufügen, wie es ein Browser täte."),
+        T("Sul PC l'app conserva solo: le impostazioni (qualità, dimensioni, cartella di destinazione) e un registro tecnico degli errori, che contiene i nomi e i percorsi dei file che non è riuscita a convertire, in ~/.local/share/Akses insieme al profilo di LibreOffice usato per stampare i documenti in PDF e, se l'hai scaricato, al componente pandoc; anteprime temporanee in /tmp/Akses, cancellate a ogni avvio; e, se attiva, la voce «Apri con Akses» del gestore dei file in ~/.local/share/nemo/actions.",
+          "On the PC the app keeps only: the settings (quality, size, output folder) and a technical error log, which contains the names and paths of files it couldn't convert, in ~/.local/share/Akses together with the LibreOffice profile used to print documents to PDF and, if you downloaded it, the pandoc component; temporary previews in /tmp/Akses, deleted at every start; and, if turned on, the file manager's \"Open with Akses\" entry in ~/.local/share/nemo/actions.",
+          "En el PC la app guarda solo: los ajustes (calidad, tamaño, carpeta de destino) y un registro técnico de errores, que contiene los nombres y rutas de los archivos que no ha podido convertir, en ~/.local/share/Akses junto con el perfil de LibreOffice usado para imprimir los documentos en PDF y, si lo has descargado, el componente pandoc; vistas previas temporales en /tmp/Akses, borradas en cada inicio; y, si está activada, la entrada «Abrir con Akses» del gestor de archivos en ~/.local/share/nemo/actions.",
+          "Sur le PC, l'app conserve uniquement : les réglages (qualité, taille, dossier de destination) et un journal technique des erreurs, qui contient les noms et chemins des fichiers qu'elle n'a pas pu convertir, dans ~/.local/share/Akses avec le profil LibreOffice utilisé pour imprimer les documents en PDF et, si vous l'avez téléchargé, le composant pandoc ; des aperçus temporaires dans /tmp/Akses, effacés à chaque démarrage ; et, si elle est activée, l'entrée « Ouvrir avec Akses » du gestionnaire de fichiers dans ~/.local/share/nemo/actions.",
+          "Auf dem PC speichert die App nur: die Einstellungen (Qualität, Größe, Zielordner) und ein technisches Fehlerprotokoll mit Namen und Pfaden der Dateien, die sie nicht konvertieren konnte, in ~/.local/share/Akses zusammen mit dem LibreOffice-Profil, mit dem Dokumente als PDF gedruckt werden, und, falls heruntergeladen, der Komponente pandoc; temporäre Vorschauen in /tmp/Akses, die bei jedem Start gelöscht werden; und, falls eingeschaltet, den Eintrag „Mit Akses öffnen“ des Dateimanagers in ~/.local/share/nemo/actions."),
+        F(T("Puoi chiederci informazioni ed esercitare i diritti previsti dal GDPR (Regolamento UE 2016/679) scrivendo a {0}. Poiché non riceviamo i tuoi dati, per cancellare tutto basta disinstallare l'app ed eliminare la cartella ~/.local/share/Akses e, se c'è, il file akses.nemo_action in ~/.local/share/nemo/actions. I file che hai convertito restano tuoi, dove li hai salvati.",
+            "You can ask us for information and exercise your rights under the GDPR (EU Regulation 2016/679) by writing to {0}. Since we never receive your data, to delete everything just uninstall the app and remove the ~/.local/share/Akses folder and, if present, the akses.nemo_action file in ~/.local/share/nemo/actions. The files you converted remain yours, where you saved them.",
+            "Puedes pedirnos información y ejercer los derechos previstos por el RGPD (Reglamento UE 2016/679) escribiendo a {0}. Como no recibimos tus datos, para borrarlo todo basta con desinstalar la app y eliminar la carpeta ~/.local/share/Akses y, si existe, el archivo akses.nemo_action de ~/.local/share/nemo/actions. Los archivos que has convertido siguen siendo tuyos, donde los guardaste.",
+            "Vous pouvez nous demander des informations et exercer vos droits prévus par le RGPD (règlement UE 2016/679) en écrivant à {0}. Comme nous ne recevons pas vos données, pour tout effacer il suffit de désinstaller l'app et de supprimer le dossier ~/.local/share/Akses et, s'il existe, le fichier akses.nemo_action dans ~/.local/share/nemo/actions. Les fichiers convertis restent à vous, là où vous les avez enregistrés.",
+            "Du kannst Auskunft verlangen und deine Rechte nach der DSGVO (EU-Verordnung 2016/679) ausüben, indem du an {0} schreibst. Da wir deine Daten nie erhalten, genügt es, die App zu deinstallieren und den Ordner ~/.local/share/Akses sowie, falls vorhanden, die Datei akses.nemo_action in ~/.local/share/nemo/actions zu löschen. Die konvertierten Dateien bleiben deine, dort, wo du sie gespeichert hast."), CompanyEmail),
+    ];
+
     public static string PrivacyOnSite => T(
         "Questa informativa è pubblicata anche sul nostro sito:",
         "This privacy policy is also published on our website:",
@@ -473,13 +540,9 @@ internal static class Strings
     public static string OwnerLine => F(T("{0}, Italia", "{0}, Italy", "{0}, Italia", "{0}, Italie", "{0}, Italien"), CompanyName);
 
     public static string LicenseHeading => T("Licenza", "License", "Licencia", "Licence", "Lizenz");
-    public static string[] LicenseParagraphs =>
+    public static string[] LicenseParagraphs => Linux ? LinuxLicenseParagraphs :
     [
-        F(T("Akses è software libero di M-Tre Consulting, distribuito sotto licenza GNU GPL v3: puoi usarlo, studiarlo, modificarlo e ridistribuirlo alle condizioni della licenza, il cui testo è nel file LICENSE installato con il programma. È fornito senza alcuna garanzia. Il codice sorgente di ogni versione è pubblico su {1}; puoi anche richiederlo scrivendo a {0}.",
-            "Akses is free software by M-Tre Consulting, distributed under the GNU GPL v3: you may use, study, modify and redistribute it under the terms of the license, whose text is in the LICENSE file installed with the program. It comes with no warranty. The source code of every version is public on {1}; you can also request it by writing to {0}.",
-            "Akses es software libre de M-Tre Consulting, distribuido bajo la licencia GNU GPL v3: puedes usarlo, estudiarlo, modificarlo y redistribuirlo según las condiciones de la licencia, cuyo texto está en el archivo LICENSE instalado con el programa. Se ofrece sin ninguna garantía. El código fuente de cada versión es público en {1}; también puedes pedirlo escribiendo a {0}.",
-            "Akses est un logiciel libre de M-Tre Consulting, distribué sous licence GNU GPL v3 : vous pouvez l'utiliser, l'étudier, le modifier et le redistribuer selon les conditions de la licence, dont le texte se trouve dans le fichier LICENSE installé avec le programme. Il est fourni sans aucune garantie. Le code source de chaque version est public sur {1} ; vous pouvez aussi le demander en écrivant à {0}.",
-            "Akses ist freie Software von M-Tre Consulting, veröffentlicht unter der GNU GPL v3: Du darfst sie gemäß den Lizenzbedingungen nutzen, untersuchen, ändern und weitergeben; der Lizenztext liegt in der Datei LICENSE, die mit dem Programm installiert wird. Sie wird ohne jede Gewährleistung bereitgestellt. Der Quellcode jeder Version ist öffentlich auf {1}; du kannst ihn auch per E-Mail an {0} anfordern."), CompanyEmail, "github.com/M-Tre-Consulting/akses"),
+        LicenseIntro,
         T("Akses usa: FFmpeg (GPL) compilato per Akses con x264, libvpx, dav1d, LAME, Opus e Vorbis, incluso nel programma; pandoc (GPL) di John MacFarlane, scaricato alla prima conversione di un documento; ImageMagick tramite Magick.NET (Apache 2.0); PDFsharp (MIT); PdfPig (Apache 2.0); YamlDotNet (MIT); Windows App SDK e WebView2 di Microsoft. Le loro licenze sono nelle cartelle tools (del programma e, per pandoc, in %LOCALAPPDATA%\\Akses), i dettagli nel file NOTICE.md.",
           "Akses uses: FFmpeg (GPL) built for Akses with x264, libvpx, dav1d, LAME, Opus and Vorbis, included in the program; pandoc (GPL) by John MacFarlane, downloaded on the first document conversion; ImageMagick through Magick.NET (Apache 2.0); PDFsharp (MIT); PdfPig (Apache 2.0); YamlDotNet (MIT); Microsoft's Windows App SDK and WebView2. Their licenses are in the tools folders (the program's and, for pandoc, %LOCALAPPDATA%\\Akses), details in the NOTICE.md file.",
           "Akses usa: FFmpeg (GPL) compilado para Akses con x264, libvpx, dav1d, LAME, Opus y Vorbis, incluido en el programa; pandoc (GPL) de John MacFarlane, descargado en la primera conversión de un documento; ImageMagick a través de Magick.NET (Apache 2.0); PDFsharp (MIT); PdfPig (Apache 2.0); YamlDotNet (MIT); Windows App SDK y WebView2 de Microsoft. Sus licencias están en las carpetas tools (del programa y, para pandoc, %LOCALAPPDATA%\\Akses), los detalles en el archivo NOTICE.md.",
@@ -492,6 +555,28 @@ internal static class Strings
           "Windows und der Datei-Explorer sind Marken der Microsoft Corporation; Formatnamen gehören ihren jeweiligen Inhabern. Akses ist nicht mit Microsoft verbunden und wird nicht von Microsoft unterstützt."),
     ];
 
+    private static string LicenseIntro =>
+        F(T("Akses è software libero di M-Tre Consulting, distribuito sotto licenza GNU GPL v3: puoi usarlo, studiarlo, modificarlo e ridistribuirlo alle condizioni della licenza, il cui testo è nel file LICENSE installato con il programma. È fornito senza alcuna garanzia. Il codice sorgente di ogni versione è pubblico su {1}; puoi anche richiederlo scrivendo a {0}.",
+            "Akses is free software by M-Tre Consulting, distributed under the GNU GPL v3: you may use, study, modify and redistribute it under the terms of the license, whose text is in the LICENSE file installed with the program. It comes with no warranty. The source code of every version is public on {1}; you can also request it by writing to {0}.",
+            "Akses es software libre de M-Tre Consulting, distribuido bajo la licencia GNU GPL v3: puedes usarlo, estudiarlo, modificarlo y redistribuirlo según las condiciones de la licencia, cuyo texto está en el archivo LICENSE instalado con el programa. Se ofrece sin ninguna garantía. El código fuente de cada versión es público en {1}; también puedes pedirlo escribiendo a {0}.",
+            "Akses est un logiciel libre de M-Tre Consulting, distribué sous licence GNU GPL v3 : vous pouvez l'utiliser, l'étudier, le modifier et le redistribuer selon les conditions de la licence, dont le texte se trouve dans le fichier LICENSE installé avec le programme. Il est fourni sans aucune garantie. Le code source de chaque version est public sur {1} ; vous pouvez aussi le demander en écrivant à {0}.",
+            "Akses ist freie Software von M-Tre Consulting, veröffentlicht unter der GNU GPL v3: Du darfst sie gemäß den Lizenzbedingungen nutzen, untersuchen, ändern und weitergeben; der Lizenztext liegt in der Datei LICENSE, die mit dem Programm installiert wird. Sie wird ohne jede Gewährleistung bereitgestellt. Der Quellcode jeder Version ist öffentlich auf {1}; du kannst ihn auch per E-Mail an {0} anfordern."), CompanyEmail, "github.com/M-Tre-Consulting/akses");
+
+    private static string[] LinuxLicenseParagraphs =>
+    [
+        LicenseIntro,
+        T("Akses usa: FFmpeg (GPL), poppler (GPL), VLC (LGPL) e LibreOffice (MPL 2.0), installati con i pacchetti del sistema; pandoc (GPL) di John MacFarlane, scaricato alla prima conversione di un documento; ImageMagick tramite Magick.NET (Apache 2.0); PDFsharp (MIT); PdfPig (Apache 2.0); YamlDotNet (MIT); Avalonia (MIT); LibVLCSharp (LGPL). Le licenze dei programmi del sistema sono in /usr/share/doc, i dettagli nel file NOTICE.md.",
+          "Akses uses: FFmpeg (GPL), poppler (GPL), VLC (LGPL) and LibreOffice (MPL 2.0), installed with the system packages; pandoc (GPL) by John MacFarlane, downloaded on the first document conversion; ImageMagick through Magick.NET (Apache 2.0); PDFsharp (MIT); PdfPig (Apache 2.0); YamlDotNet (MIT); Avalonia (MIT); LibVLCSharp (LGPL). The licenses of the system programs are in /usr/share/doc, details in the NOTICE.md file.",
+          "Akses usa: FFmpeg (GPL), poppler (GPL), VLC (LGPL) y LibreOffice (MPL 2.0), instalados con los paquetes del sistema; pandoc (GPL) de John MacFarlane, descargado en la primera conversión de un documento; ImageMagick a través de Magick.NET (Apache 2.0); PDFsharp (MIT); PdfPig (Apache 2.0); YamlDotNet (MIT); Avalonia (MIT); LibVLCSharp (LGPL). Las licencias de los programas del sistema están en /usr/share/doc, los detalles en el archivo NOTICE.md.",
+          "Akses utilise : FFmpeg (GPL), poppler (GPL), VLC (LGPL) et LibreOffice (MPL 2.0), installés avec les paquets du système ; pandoc (GPL) de John MacFarlane, téléchargé à la première conversion d'un document ; ImageMagick via Magick.NET (Apache 2.0) ; PDFsharp (MIT) ; PdfPig (Apache 2.0) ; YamlDotNet (MIT) ; Avalonia (MIT) ; LibVLCSharp (LGPL). Les licences des programmes du système se trouvent dans /usr/share/doc, les détails dans le fichier NOTICE.md.",
+          "Akses verwendet: FFmpeg (GPL), poppler (GPL), VLC (LGPL) und LibreOffice (MPL 2.0), mit den Systempaketen installiert; pandoc (GPL) von John MacFarlane, bei der ersten Dokumentkonvertierung heruntergeladen; ImageMagick über Magick.NET (Apache 2.0); PDFsharp (MIT); PdfPig (Apache 2.0); YamlDotNet (MIT); Avalonia (MIT); LibVLCSharp (LGPL). Die Lizenzen der Systemprogramme liegen in /usr/share/doc, Details in der Datei NOTICE.md."),
+        T("Linux è un marchio registrato di Linus Torvalds; i nomi dei formati appartengono ai rispettivi titolari.",
+          "Linux is a registered trademark of Linus Torvalds; format names belong to their respective owners.",
+          "Linux es una marca registrada de Linus Torvalds; los nombres de los formatos pertenecen a sus respectivos titulares.",
+          "Linux est une marque déposée de Linus Torvalds ; les noms des formats appartiennent à leurs titulaires respectifs.",
+          "Linux ist eine eingetragene Marke von Linus Torvalds; Formatnamen gehören ihren jeweiligen Inhabern."),
+    ];
+
     public static string ContactsHeading => T("Contatti", "Contacts", "Contacto", "Contacts", "Kontakt");
-    public static string LastUpdated => T("Aggiornata il 19 ottobre 2026.", "Last updated on 19 October 2026.", "Actualizada el 19 de octubre de 2026.", "Mise à jour le 19 octobre 2026.", "Aktualisiert am 19. Oktober 2026.");
+    public static string LastUpdated => T("Aggiornata il 25 ottobre 2026.", "Last updated on 25 October 2026.", "Actualizada el 25 de octubre de 2026.", "Mise à jour le 25 octobre 2026.", "Aktualisiert am 25. Oktober 2026.");
 }
