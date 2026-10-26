@@ -113,7 +113,7 @@ make -s distclean >/dev/null 2>&1 || true
     --enable-zlib --enable-libx264 --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libdav1d \
     --disable-encoders --enable-encoder=libx264,libvpx_vp8,libvpx_vp9,aac,libmp3lame,libopus,libvorbis,flac,alac,pcm_s16le,pcm_s16be,pcm_s24le,mpeg4,gif,png,mjpeg,subrip,srt,webvtt,ass,ssa,mov_text \
     --disable-muxers --enable-muxer=mp4,mov,ipod,matroska,webm,avi,gif,mp3,wav,flac,ogg,opus,aiff,adts,image2,srt,webvtt,ass,null \
-    --disable-filters --enable-filter=scale,format,fps,split,palettegen,paletteuse,trim,atrim,setpts,asetpts,concat,aformat,aresample,showwavespic,null,anull,copy,acopy,pad,crop,transpose,hflip,vflip \
+    --disable-filters --enable-filter=scale,format,fps,split,palettegen,paletteuse,trim,atrim,setpts,asetpts,concat,aformat,aresample,setsar,anullsrc,showwavespic,null,anull,copy,acopy,pad,crop,transpose,hflip,vflip \
     >/dev/null
 make -s -j"$JOBS"
 make -s install

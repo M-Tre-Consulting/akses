@@ -39,6 +39,11 @@ scheda prima di cambiare licenza, release o download.** Brand, firma, privacy e 
 
 ## Da sapere
 
+- **Aggiornamenti automatici** (dalla 1.1.0): l'app chiede `mtre-consulting.it/aggiornamenti/akses` (Linux:
+  `akses-linux`), che legge l'ultima release GitHub, quindi basta la release. Su Windows l'installer nuovo si
+  installa in silenzio alla chiusura o con «Aggiorna e riavvia» (`/relaunch=1` in `Akses.iss`); su Linux con
+  pkexec + apt. Per provarli prima di una release: `AKSES_UPDATE_SITE=http://127.0.0.1:<porta>/aggiornamenti/`
+  e un server finto che risponde `{"version": ...}` e manda l'installer su `/scarica`.
 - Il sito online lo aggiorna Nicolò a mano (`deploy/update.sh` sul server): non serve aspettarlo.
 - Installer non ancora firmato: sulla pagina c'è la nota su SmartScreen. Quando arriva la firma
   (Authenticode), firma exe e installer, fai una release e togli la nota (`NOTES.windows` in

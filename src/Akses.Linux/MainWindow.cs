@@ -22,6 +22,7 @@ internal sealed class MainWindow : Window
     private readonly TrimPage _trim = new();
     private readonly ImagePage _image = new();
     private readonly PdfPage _pdf = new();
+    private readonly JoinPage _join = new();
     private readonly SettingsPage _settings = new();
     private Control? _beforeSettings;
 
@@ -43,6 +44,7 @@ internal sealed class MainWindow : Window
         var root = new Grid { RowDefinitions = new RowDefinitions("*,Auto"), Margin = new Thickness(0, 12, 0, 0) };
         root.Children.Add(_pageHost);
         var signature = BuildSignature();
+        signature.Children.Add(BuildUpdateBar());
         Grid.SetRow(signature, 1);
         root.Children.Add(signature);
 
@@ -61,6 +63,7 @@ internal sealed class MainWindow : Window
         _trim.BackRequested += BackToFile;
         _image.BackRequested += BackToFile;
         _pdf.BackRequested += BackToFile;
+        _join.BackRequested += BackToFile;
         _settings.BackRequested += () => Show(_beforeSettings ?? _home);
         _settings.OutputFolderChanged += _file.UpdateSaveTo;
         Show(_home);
@@ -74,6 +77,43 @@ internal sealed class MainWindow : Window
             }
         };
         Closing += (_, _) => _trim.Shutdown();
+
+        AutoUpdate.Ready += () => Avalonia.Threading.Dispatcher.UIThread.Post(ShowUpdateBar);
+        AutoUpdate.Start();
+    }
+
+    private readonly StackPanel _updateBar = new() { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Center, IsVisible = false };
+    private readonly TextBlock _updateText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+
+    /// <summary>"Akses 1.2.0 è pronto · Installa", in the middle of the signature row.</summary>
+    private StackPanel BuildUpdateBar()
+    {
+        _updateBar.Children.Add(_updateText);
+        Button install = null!;
+        install = Ui.Link(Strings.UpdateInstall, async () =>
+        {
+            install.IsEnabled = false;
+            try
+            {
+                if (await AutoUpdate.InstallAsync())
+                {
+                    AutoUpdate.Relaunch();
+                    Close();
+                }
+            }
+            catch (Exception ex) { _updateText.Text = ex.Message; }
+            install.IsEnabled = true;
+        });
+        _updateBar.Children.Add(install);
+        Grid.SetColumn(_updateBar, 1);
+        return _updateBar;
+    }
+
+    private void ShowUpdateBar()
+    {
+        if (AutoUpdate.Pending is not { } update) return;
+        _updateText.Text = Strings.UpdateReady(update.Version.ToString(3));
+        _updateBar.IsVisible = true;
     }
 
     private Grid BuildHome()
@@ -160,6 +200,10 @@ internal sealed class MainWindow : Window
             case FileView.Tool.Crop or FileView.Tool.Image:
                 _ = _image.LoadAsync(files[0], crop: tool == FileView.Tool.Crop);
                 Show(_image);
+                break;
+            case FileView.Tool.Join:
+                _join.Open(files);
+                Show(_join);
                 break;
             default:
                 _pdf.Open(tool switch

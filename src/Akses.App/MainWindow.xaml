@@ -33,7 +33,7 @@
         <!-- M-Tre signature (brand guide, m-tre-site/brand/README.md section 1): always visible.
              Logo + name open the company site; the year opens "Privacy, licenza e contatti".
              Name and year are not localized. -->
-        <Grid Grid.Row="2" Padding="14,2,14,4">
+        <Grid x:Name="SignatureGrid" Grid.Row="2" Padding="14,2,14,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />

@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
     private readonly TrimPage _trim = new();
     private readonly ImagePage _image = new();
     private readonly PdfPage _pdf = new();
+    private readonly JoinPage _join = new();
     private readonly SettingsPage _settings = new();
     private UIElement? _beforeSettings;
 
@@ -52,9 +53,38 @@ public sealed partial class MainWindow : Window
         _trim.BackRequested += BackToFile;
         _image.BackRequested += BackToFile;
         _pdf.BackRequested += BackToFile;
+        _join.BackRequested += BackToFile;
         _settings.BackRequested += () => Show(_beforeSettings ?? _home);
         _settings.OutputFolderChanged += _file.UpdateSaveTo;
         Show(_home);
+
+        BuildUpdateBar();
+        AutoUpdate.Ready += () => DispatcherQueue.TryEnqueue(ShowUpdateBar);
+        AutoUpdate.Start();
+        // A downloaded update is installed when Akses closes, silently: the next start is the new version.
+        Closed += (_, _) => AutoUpdate.Launch(relaunch: false);
+    }
+
+    private readonly StackPanel _updateBar = new() { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
+    private readonly TextBlock _updateText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+
+    /// <summary>"Akses 1.2.0 è pronto · Aggiorna e riavvia", in the middle of the signature row.</summary>
+    private void BuildUpdateBar()
+    {
+        _updateBar.Children.Add(new FontIcon { Glyph = "", FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = FileCard.Brush("AccentTextFillColorPrimaryBrush") });
+        _updateBar.Children.Add(_updateText);
+        var install = new HyperlinkButton { Content = Strings.UpdateInstall, FontSize = 12, Padding = new Thickness(6, 2, 6, 2) };
+        install.Click += (_, _) => { if (AutoUpdate.Launch(relaunch: true)) Close(); };
+        _updateBar.Children.Add(install);
+        Grid.SetColumn(_updateBar, 1);
+        SignatureGrid.Children.Add(_updateBar);
+    }
+
+    private void ShowUpdateBar()
+    {
+        if (AutoUpdate.Pending is not { } update) return;
+        _updateText.Text = Strings.UpdateReady(update.Version.ToString(3));
+        _updateBar.Visibility = Visibility.Visible;
     }
 
     private Grid BuildHome()
@@ -124,6 +154,10 @@ public sealed partial class MainWindow : Window
             case FileView.Tool.Crop or FileView.Tool.Image:
                 _ = _image.LoadAsync(files[0], crop: tool == FileView.Tool.Crop);
                 Show(_image);
+                break;
+            case FileView.Tool.Join:
+                _join.Open(files);
+                Show(_join);
                 break;
             default:
                 _pdf.Open(tool switch

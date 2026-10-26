@@ -14,9 +14,9 @@ la sua pagina: anteprima, informazioni e, sotto, tutte le possibilità.
 - **Modifica**, secondo il tipo di file:
   - foto: ritaglia (con proporzioni 1:1, 16:9…), ridimensiona in pixel, ruota e rifletti,
     alleggerisci, togli posizione GPS e dati EXIF, crea un PDF;
-  - video: taglia (tieni un pezzo o togline uno), estrai l'audio, crea una GIF, alleggerisci,
-    togli l'audio;
-  - audio: taglia, alleggerisci;
+  - video: taglia (tieni un pezzo o togline uno), unisci più video uno dopo l'altro, estrai
+    l'audio, crea una GIF, alleggerisci, togli l'audio;
+  - audio: taglia, unisci, alleggerisci;
   - PDF: dividi in pagine, estrai pagine, ruota pagine, unisci con altri PDF e immagini,
     pagine in immagini, estrai il testo.
 - Il taglio di audio e video **copia i flussi senza ricodificarli**: anche un film di due ore è
@@ -25,7 +25,9 @@ la sua pagina: anteprima, informazioni e, sotto, tutte le possibilità.
   i file dello stesso tipo.
 - L'originale non viene mai toccato; i nomi nuovi non sovrascrivono mai niente
   (`foto (1).png`).
-- Niente account, niente internet, niente statistiche: tutto succede sul PC.
+- Niente account, niente statistiche: tutto succede sul PC. Internet serve solo per gli aggiornamenti
+  automatici (`Updates.cs`: chiede al sito M-Tre l'ultima versione, si spengono in Impostazioni) e per
+  scaricare pandoc la prima volta.
 - 5 lingue (italiano, inglese, spagnolo, francese, tedesco) dalla lingua di Windows; le altre
   in inglese (`AKSES_LANG=ja` per provarlo).
 
@@ -34,7 +36,7 @@ la sua pagina: anteprima, informazioni e, sotto, tutte le possibilità.
 | Cartella | Cosa c'è |
 |---|---|
 | `src/Akses.Core` | i motori, senza interfaccia: `FormatCatalog` (formati letti e in cosa si convertono), `Converter`, `Engines/` (immagini con Magick.NET, audio/video con ffmpeg, PDF con PDFsharp + `Windows.Data.Pdf` (su Linux `pdftoppm`) + PdfPig, documenti con pandoc, dati in C#). Compila sia per Windows sia per `net9.0` (Linux) |
-| `src/Akses.App` | l'app WinUI 3: `MainWindow` (una schermata alla volta), `FileView` (la pagina del file), gli strumenti `TrimPage`, `ImagePage`, `PdfPage`, `SettingsPage`, i testi in 5 lingue in `Strings.cs` |
+| `src/Akses.App` | l'app WinUI 3: `MainWindow` (una schermata alla volta), `FileView` (la pagina del file), gli strumenti `TrimPage`, `JoinPage`, `ImagePage`, `PdfPage`, `SettingsPage`, gli aggiornamenti in `AutoUpdate`, i testi in 5 lingue in `Strings.cs` |
 | `src/Akses.Linux` | l'app per Linux, in Avalonia: le stesse pagine con gli stessi nomi, rifatte senza WinUI. `Strings.cs`, `Settings.cs` e `AppLog.cs` sono quelli dell'app Windows (collegati, non copiati) |
 | `tests/Akses.Core.Tests` | test xUnit: conversioni vere su file generati al volo |
 | `installer/` | `build-ffmpeg.sh` (l'ffmpeg ridotto, da WSL), `fetch-tools.ps1` (pandoc per sviluppare), `build-installer.ps1`, `Akses.iss` (Inno Setup); per Linux `build-linux.ps1` e `linux/` (`build-deb.sh`, `akses.desktop`) |

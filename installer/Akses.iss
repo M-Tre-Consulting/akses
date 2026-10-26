@@ -89,6 +89,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 ; menu text is in the user's language and the path is the installed exe.
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-shell"; Flags: runhidden waituntilterminated; Tasks: explorermenu
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+; "Aggiorna e riavvia" in the app (AutoUpdate.cs) runs this installer silently with /relaunch=1: reopen Akses.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: RelaunchAfterUpdate
 
 [UninstallRun]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--unregister-shell"; Flags: runhidden waituntilterminated; RunOnceId: "UnregisterShell"
@@ -98,3 +100,9 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--unregister-shell"; Flags: runh
 ; promises that uninstalling removes everything the app stored. Converted files are the user's.
 Type: filesandordirs; Name: "{localappdata}\Akses"
 Type: filesandordirs; Name: "{%TEMP}\Akses"
+
+[Code]
+function RelaunchAfterUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;

@@ -27,9 +27,9 @@ public sealed class ConversionTests : IDisposable
     /// A test clip: a moving gradient (raw RGB frames) and a 440 Hz tone (WAV), both written here and
     /// encoded by the shipped ffmpeg. The slim build has no lavfi test sources, on purpose.
     /// </summary>
-    private async Task<string> Media(string name, bool video, double seconds = 3)
+    private async Task<string> Media(string name, bool video, double seconds = 3, int w = 160, int h = 120, bool audio = true)
     {
-        const int w = 160, h = 120, fps = 25, rate = 44100;
+        const int fps = 25, rate = 44100;
         string path = Path.Combine(_dir, name);
         string wav = Path.Combine(_dir, Path.GetFileNameWithoutExtension(name) + "-src.wav");
         int samples = (int)(seconds * rate);
@@ -62,8 +62,9 @@ public sealed class ConversionTests : IDisposable
             }
             args.AddRange(["-f", "rawvideo", "-pix_fmt", "rgb24", "-s", $"{w}x{h}", "-r", $"{fps}", "-i", raw]);
         }
-        args.AddRange(["-i", wav]);
-        if (video) args.AddRange(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "25", "-c:a", "aac", "-shortest"]);
+        if (audio) args.AddRange(["-i", wav]);
+        if (video) args.AddRange(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "25"]);
+        if (video && audio) args.AddRange(["-c:a", "aac", "-shortest"]);
         args.Add(path);
         await Tools.RunAsync(Tools.Ffmpeg, args, CancellationToken.None);
         return path;
@@ -131,6 +132,60 @@ public sealed class ConversionTests : IDisposable
         await MediaEngine.TrimAsync(src, output, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), precise, remove, null, CancellationToken.None);
         double seconds = (await MediaEngine.ProbeAsync(output)).Duration.TotalSeconds;
         Assert.InRange(seconds, remove ? 3.5 : 1.5, remove ? 4.6 : 2.6);
+    }
+
+    [Fact]
+    public async Task Join_alike_videos_by_copy()
+    {
+        string a = await Media("join-a.mp4", video: true, seconds: 2), b = await Media("join-b.mp4", video: true, seconds: 3);
+        Assert.Equal("mp4", MediaEngine.JoinExtension([a, b], video: true));
+        string output = Path.Combine(_dir, "joined.mp4");
+        await MediaEngine.JoinAsync([a, b], output, null, CancellationToken.None);
+        MediaInfo info = await MediaEngine.ProbeAsync(output);
+        Assert.True(info.HasVideo && info.HasAudio);
+        Assert.InRange(info.Duration.TotalSeconds, 4.6, 5.5);
+    }
+
+    [Fact]
+    public async Task Join_different_videos_reencodes_to_the_first()
+    {
+        string a = await Media("big.mp4", video: true, seconds: 2, w: 320, h: 180);
+        string b = await Media("small-silent.mp4", video: true, seconds: 2, w: 120, h: 160, audio: false);
+        string c = await Media("other.mkv", video: true, seconds: 1);
+        Assert.Equal("mp4", MediaEngine.JoinExtension([a, b, c], video: true));
+        string output = Path.Combine(_dir, "joined-mixed.mp4");
+        await MediaEngine.JoinAsync([a, b, c], output, null, CancellationToken.None);
+        MediaInfo info = await MediaEngine.ProbeAsync(output);
+        Assert.Equal((320, 180), (info.Width, info.Height));
+        Assert.True(info.HasAudio);
+        Assert.InRange(info.Duration.TotalSeconds, 4.6, 5.5);
+    }
+
+    [Fact]
+    public async Task Join_follows_the_rotation_of_a_phone_video()
+    {
+        string landscape = await Media("land.mp4", video: true, seconds: 1);
+        string rotated = Path.Combine(_dir, "portrait.mp4");
+        await Tools.RunAsync(Tools.Ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", "-display_rotation", "90", "-i", landscape, "-c", "copy", rotated], CancellationToken.None);
+        MediaInfo portrait = await MediaEngine.ProbeAsync(rotated);
+        Assert.Equal((120, 160), (portrait.Width, portrait.Height));
+        string output = Path.Combine(_dir, "joined-portrait.mp4");
+        await MediaEngine.JoinAsync([rotated, landscape], output, null, CancellationToken.None);
+        MediaInfo info = await MediaEngine.ProbeAsync(output);
+        Assert.Equal((120, 160), (info.Width, info.Height));
+    }
+
+    [Fact]
+    public async Task Join_audio()
+    {
+        string a = await Media("tone-a.wav", video: false, seconds: 2), b = await Media("tone-b.wav", video: false, seconds: 1);
+        string mp3 = await Converter.ConvertAsync(b, FormatCatalog.Mp3, Defaults, null, CancellationToken.None);
+        Assert.Equal("m4a", MediaEngine.JoinExtension([a, mp3], video: false));
+        string output = Path.Combine(_dir, "joined.m4a");
+        await MediaEngine.JoinAsync([a, mp3], output, null, CancellationToken.None);
+        MediaInfo info = await MediaEngine.ProbeAsync(output);
+        Assert.True(info.HasAudio && !info.HasVideo);
+        Assert.InRange(info.Duration.TotalSeconds, 2.8, 3.3);
     }
 
     [Fact]

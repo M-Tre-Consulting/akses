@@ -53,6 +53,34 @@ internal sealed class SettingsPage : UserControl
         };
         stack.Children.Add(_shell);
 
+        stack.Children.Add(Ui.SectionTitle(Strings.UpdatesSection));
+        stack.Children.Add(new TextBlock { Text = Strings.UpdatesHint, TextWrapping = TextWrapping.Wrap, Opacity = 0.75 });
+        var updates = new ToggleSwitch { OnContent = Strings.On, OffContent = Strings.Off, IsOn = Settings.Current.AutoUpdate };
+        updates.Toggled += (_, _) => { Settings.Current.AutoUpdate = updates.IsOn; Settings.Current.Save(); };
+        stack.Children.Add(updates);
+        var checkRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+        var check = new Button { Content = Strings.CheckNow };
+        var checkStatus = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Opacity = 0.75 };
+        check.Click += async (_, _) =>
+        {
+            check.IsEnabled = false;
+            checkStatus.Text = Strings.UpdateChecking;
+            try
+            {
+                checkStatus.Text = await AutoUpdate.CheckNowAsync() && AutoUpdate.Pending is { } u
+                    ? Strings.UpdateReady(u.Version.ToString(3)) : Strings.UpToDate;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write($"Controllo aggiornamenti non riuscito: {ex}");
+                checkStatus.Text = Strings.UpdateCheckFailed;
+            }
+            check.IsEnabled = true;
+        };
+        checkRow.Children.Add(check);
+        checkRow.Children.Add(checkStatus);
+        stack.Children.Add(checkRow);
+
         stack.Children.Add(Ui.SectionTitle(Strings.About));
         stack.Children.Add(new TextBlock { Text = $"{Strings.AppName} · {Strings.VersionLabel}", FontWeight = FontWeights.SemiBold });
         stack.Children.Add(new TextBlock { Text = Strings.AboutText, TextWrapping = TextWrapping.Wrap, Opacity = 0.75 });

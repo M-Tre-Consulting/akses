@@ -20,6 +20,8 @@ internal sealed partial class Settings
     public Quality Quality { get; set; } = Quality.High;
     /// <summary>Longest side for images and videos in the convert screen; null = original size.</summary>
     public int? MaxSide { get; set; }
+    /// <summary>Check for a new version and install it (AutoUpdate.cs); on by default, off in Impostazioni.</summary>
+    public bool AutoUpdate { get; set; } = true;
 
     public ConversionOptions ToOptions() => new() { Quality = Quality, MaxSide = MaxSide, OutputFolder = OutputFolder };
 

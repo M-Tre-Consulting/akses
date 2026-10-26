@@ -46,7 +46,7 @@ internal sealed class FileView : UserControl
     /// <summary>A tool that needs its own screen: trim, image editor, PDF tools.</summary>
     public event Action<Tool, IReadOnlyList<string>>? ToolRequested;
 
-    public enum Tool { Trim, Crop, Image, PdfMerge, PdfExtract, PdfRotate }
+    public enum Tool { Trim, Crop, Image, PdfMerge, PdfExtract, PdfRotate, Join }
 
     public FileView()
     {
@@ -334,10 +334,12 @@ internal sealed class FileView : UserControl
                 Add("\uE786", Strings.ActGif, Strings.ActGifText, () => ConvertFiles(Targets, FormatCatalog.Gif));
                 Add("\uE73F", Strings.ActCompress, Strings.ActCompressVideoText, () => RunOnTargets(Strings.ActCompress, CompressVideoAsync));
                 Add("\uE74F", Strings.ActRemoveAudio, Strings.ActRemoveAudioText, () => RunOnTargets(Strings.ActRemoveAudio, RemoveAudioAsync));
+                Add("", Strings.ActJoin, Strings.ActJoinVideoText, () => ToolRequested?.Invoke(Tool.Join, JoinCandidates()));
                 break;
             case FileKind.Audio:
                 Add("\uE8C6", Strings.ActTrim, Strings.ActTrimText, () => OpenTool(Tool.Trim));
                 Add("\uE73F", Strings.ActCompress, Strings.ActCompressAudioText, () => RunOnTargets(Strings.ActCompress, CompressAudioAsync));
+                Add("", Strings.ActJoin, Strings.ActJoinAudioText, () => ToolRequested?.Invoke(Tool.Join, JoinCandidates()));
                 break;
             case FileKind.Pdf:
                 Add("\uE8C6", Strings.ActSplit, Strings.ActSplitText, () => RunOnTargets(Strings.ActSplit, SplitAsync));
@@ -359,6 +361,15 @@ internal sealed class FileView : UserControl
     private List<string> PdfMergeCandidates()
     {
         var list = _files.Where(f => FormatCatalog.KindOf(f) is FileKind.Pdf or FileKind.Image).ToList();
+        list.Remove(Current);
+        list.Insert(0, Current);
+        return list;
+    }
+
+    /// <summary>The videos (or audio files) in the list, the one shown first: what "unisci" starts from.</summary>
+    private List<string> JoinCandidates()
+    {
+        var list = SameKind;
         list.Remove(Current);
         list.Insert(0, Current);
         return list;

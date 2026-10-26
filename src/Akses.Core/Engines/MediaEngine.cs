@@ -3,7 +3,9 @@ using System.Text.Json;
 
 namespace Akses.Core.Engines;
 
-public sealed record MediaInfo(TimeSpan Duration, bool HasVideo, bool HasAudio, int Width, int Height, string? VideoCodec, string? AudioCodec);
+/// <summary>What ffprobe says about a file. Width and Height are as shown, after the rotation phones store in the file.</summary>
+public sealed record MediaInfo(TimeSpan Duration, bool HasVideo, bool HasAudio, int Width, int Height, string? VideoCodec, string? AudioCodec,
+    double FrameRate = 0, int SampleRate = 0, int Channels = 0);
 
 /// <summary>Audio, video and subtitles, through ffmpeg/ffprobe.</summary>
 public static class MediaEngine
@@ -22,7 +24,8 @@ public static class MediaEngine
             double.TryParse(d.GetString(), NumberStyles.Float, Inv, out seconds);
 
         bool hasVideo = false, hasAudio = false;
-        int width = 0, height = 0;
+        int width = 0, height = 0, sampleRate = 0, channels = 0;
+        double frameRate = 0;
         string? vcodec = null, acodec = null;
         if (root.TryGetProperty("streams", out JsonElement streams))
         {
@@ -38,15 +41,44 @@ public static class MediaEngine
                     vcodec = codec;
                     width = s.TryGetProperty("width", out JsonElement w) ? w.GetInt32() : 0;
                     height = s.TryGetProperty("height", out JsonElement h) ? h.GetInt32() : 0;
+                    if (Math.Abs(Rotation(s)) % 180 == 90) (width, height) = (height, width);
+                    double avg = Rate(s, "avg_frame_rate");
+                    frameRate = avg is > 0 and <= 240 ? avg : Rate(s, "r_frame_rate");
                 }
                 else if (type == "audio" && !hasAudio)
                 {
                     hasAudio = true;
                     acodec = codec;
+                    if (s.TryGetProperty("sample_rate", out JsonElement sr)) int.TryParse(sr.GetString(), NumberStyles.Integer, Inv, out sampleRate);
+                    channels = s.TryGetProperty("channels", out JsonElement ch) ? ch.GetInt32() : 0;
                 }
             }
         }
-        return new MediaInfo(TimeSpan.FromSeconds(seconds), hasVideo, hasAudio, width, height, vcodec, acodec);
+        return new MediaInfo(TimeSpan.FromSeconds(seconds), hasVideo, hasAudio, width, height, vcodec, acodec, frameRate, sampleRate, channels);
+    }
+
+    /// <summary>Degrees a phone video is turned when played: the display matrix, or the old "rotate" tag.</summary>
+    private static int Rotation(JsonElement stream)
+    {
+        if (stream.TryGetProperty("side_data_list", out JsonElement sides))
+            foreach (JsonElement side in sides.EnumerateArray())
+                if (side.TryGetProperty("rotation", out JsonElement r) && r.TryGetDouble(out double deg))
+                    return (int)Math.Round(deg);
+        if (stream.TryGetProperty("tags", out JsonElement tags) && tags.TryGetProperty("rotate", out JsonElement rot)
+            && int.TryParse(rot.GetString(), NumberStyles.Integer, Inv, out int tagged))
+            return tagged;
+        return 0;
+    }
+
+    /// <summary>"30000/1001" → 29.97; 0 when missing.</summary>
+    private static double Rate(JsonElement stream, string property)
+    {
+        string text = stream.TryGetProperty(property, out JsonElement e) ? e.GetString() ?? "" : "";
+        string[] parts = text.Split('/');
+        if (parts.Length == 2 && double.TryParse(parts[0], NumberStyles.Float, Inv, out double num)
+            && double.TryParse(parts[1], NumberStyles.Float, Inv, out double den) && den > 0)
+            return num / den;
+        return 0;
     }
 
     // ---- convert ---------------------------------------------------------------------------
@@ -271,6 +303,124 @@ public static class MediaEngine
         };
         string[] audio = info.HasAudio ? VideoAudioEncoder(ext, Quality.High) : [];
         return [.. video, .. audio];
+    }
+
+    // ---- join ------------------------------------------------------------------------------
+
+    private static readonly string[] JoinVideoContainers = ["mp4", "mov", "mkv", "webm", "avi"];
+    private static readonly string[] JoinAudioContainers = ["mp3", "m4a", "wav", "flac", "ogg", "opus", "aiff"];
+
+    /// <summary>
+    /// The extension of <paramref name="inputs"/> joined: theirs when they all share one ffmpeg can
+    /// write, otherwise MP4 (video) or M4A (audio).
+    /// </summary>
+    public static string JoinExtension(IReadOnlyList<string> inputs, bool video)
+    {
+        var exts = inputs.Select(f => TrimExtension(f, video)).Distinct().ToList();
+        string[] writable = video ? JoinVideoContainers : JoinAudioContainers;
+        return exts.Count == 1 && writable.Contains(exts[0]) ? exts[0] : video ? "mp4" : "m4a";
+    }
+
+    /// <summary>
+    /// <paramref name="inputs"/> one after the other, in this order. Files that are all alike (same
+    /// format, codecs, size, frame rate and audio, e.g. clips from the same phone) are copied as they
+    /// are, in a few seconds. Otherwise everything is re-encoded to the size and frame rate of the
+    /// first one: the others fit inside it with black bars, and a video without sound gets silence.
+    /// </summary>
+    public static async Task JoinAsync(IReadOnlyList<string> inputs, string output, IProgress<double>? progress, CancellationToken ct)
+    {
+        if (inputs.Count < 2) throw new ArgumentException("joining needs at least two files");
+        var infos = new List<MediaInfo>();
+        foreach (string f in inputs) infos.Add(await ProbeAsync(f, ct).ConfigureAwait(false));
+        MediaInfo first = infos[0];
+        bool video = first.HasVideo;
+        if (video && infos.Any(i => !i.HasVideo)) throw new InvalidDataException("no video track");
+        if (!video && infos.Any(i => !i.HasAudio)) throw new InvalidDataException("no audio track");
+        string ext = Path.GetExtension(output).TrimStart('.').ToLowerInvariant();
+        TimeSpan total = TimeSpan.FromTicks(infos.Sum(i => i.Duration.Ticks));
+
+        bool alike = inputs.All(f => string.Equals(Path.GetExtension(f).TrimStart('.'), ext, StringComparison.OrdinalIgnoreCase))
+            && infos.All(i => i.HasVideo == first.HasVideo && i.HasAudio == first.HasAudio
+                && i.VideoCodec == first.VideoCodec && i.Width == first.Width && i.Height == first.Height
+                && Math.Abs(i.FrameRate - first.FrameRate) < 0.01
+                && i.AudioCodec == first.AudioCodec && i.SampleRate == first.SampleRate && i.Channels == first.Channels);
+        if (alike)
+        {
+            try
+            {
+                await JoinByCopyAsync(inputs, output, total, progress, ct).ConfigureAwait(false);
+                return;
+            }
+            catch (ToolFailedException)
+            {
+                // Alike on paper but not for the concat demuxer (odd timestamps): re-encode instead.
+            }
+        }
+
+        // One filter graph: every input brought to the same shape, then concat.
+        var graph = new System.Text.StringBuilder();
+        var pads = new System.Text.StringBuilder();
+        bool anyAudio = infos.Any(i => i.HasAudio);
+        if (video)
+        {
+            int w = Math.Max(2, first.Width / 2 * 2), h = Math.Max(2, first.Height / 2 * 2);
+            string fps = (first.FrameRate is > 0 and <= 120 ? first.FrameRate : 30).ToString("0.###", Inv);
+            for (int i = 0; i < infos.Count; i++)
+            {
+                graph.Append($"[{i}:v:0]scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[v{i}];");
+                if (anyAudio)
+                    graph.Append(infos[i].HasAudio
+                        ? $"[{i}:a:0]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo[a{i}];"
+                        : $"anullsrc=r=48000:cl=stereo,atrim=duration={Seconds(infos[i].Duration)}[a{i}];");
+                pads.Append(anyAudio ? $"[v{i}][a{i}]" : $"[v{i}]");
+            }
+        }
+        else
+        {
+            int rate = first.SampleRate > 0 ? first.SampleRate : 48000;
+            string layout = infos.All(i => i.Channels == 1) ? "mono" : "stereo";
+            for (int i = 0; i < infos.Count; i++)
+            {
+                graph.Append($"[{i}:a:0]aresample={rate},aformat=sample_rates={rate}:channel_layouts={layout}[a{i}];");
+                pads.Append($"[a{i}]");
+            }
+        }
+        bool audioOut = !video || anyAudio;
+        graph.Append(pads).Append($"concat=n={infos.Count}:v={(video ? 1 : 0)}:a={(audioOut ? 1 : 0)}");
+        if (video) graph.Append("[v]");
+        if (audioOut) graph.Append("[a]");
+
+        var args = new List<string> { "-hide_banner", "-loglevel", "error", "-nostats", "-progress", "pipe:1", "-y" };
+        foreach (string f in inputs) args.AddRange(["-i", f]);
+        args.AddRange(["-filter_complex", graph.ToString()]);
+        if (video) args.AddRange(["-map", "[v]"]);
+        if (audioOut) args.AddRange(["-map", "[a]"]);
+        args.AddRange(video ? ReencodeFor(ext, first with { HasAudio = anyAudio }) : AudioEncoder(ext, Quality.High));
+        if (ext is "mp4" or "mov" or "m4a") args.AddRange(["-movflags", "+faststart"]);
+        args.Add(output);
+        await RunWithProgressAsync(args, total, progress, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>The concat demuxer: the streams copied one after the other, no re-encoding.</summary>
+    private static async Task JoinByCopyAsync(IReadOnlyList<string> inputs, string output, TimeSpan total, IProgress<double>? progress, CancellationToken ct)
+    {
+        string work = Path.Combine(Path.GetTempPath(), "Akses", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            string list = Path.Combine(work, "list.txt");
+            await File.WriteAllLinesAsync(list, inputs.Select(f => $"file '{Path.GetFullPath(f).Replace("'", "'\\''")}'"), ct).ConfigureAwait(false);
+            string ext = Path.GetExtension(output).TrimStart('.').ToLowerInvariant();
+            var args = new List<string> { "-hide_banner", "-loglevel", "error", "-nostats", "-progress", "pipe:1", "-y",
+                "-f", "concat", "-safe", "0", "-i", list, "-map", "0:v?", "-map", "0:a?", "-c", "copy" };
+            if (ext is "mp4" or "mov" or "m4a") args.AddRange(["-movflags", "+faststart"]);
+            args.Add(output);
+            await RunWithProgressAsync(args, total, progress, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            OutputPaths.TryDelete(work);
+        }
     }
 
     // ---- previews --------------------------------------------------------------------------
