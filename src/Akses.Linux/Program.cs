@@ -48,6 +48,8 @@ internal static class Program
         if (!isFirst && SendToRunningInstance(args)) return 0;
 
         InitialArgs = args;
+        // Picks the audio track of films with several (CurrentUICulture is invariant in Release).
+        Akses.Core.Engines.MediaEngine.AppLanguage = Strings.Language;
         try
         {
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

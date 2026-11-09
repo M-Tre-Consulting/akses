@@ -46,6 +46,8 @@ internal static class Program
         }
 
         InitialArgs = args;
+        // Picks the audio track of films with several (CurrentUICulture is invariant in Release).
+        Akses.Core.Engines.MediaEngine.AppLanguage = Strings.Language;
         // WebView2 (documents → PDF) would otherwise create its profile next to the exe.
         Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", Path.Combine(Settings.DataFolder, "WebView2"));
 

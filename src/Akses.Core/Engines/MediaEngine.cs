@@ -17,6 +17,12 @@ public static class MediaEngine
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
+    /// <summary>
+    /// The app's language ("it", "en"…), set at startup from Strings.Language: it picks the audio
+    /// track (<see cref="PreferredAudioTrack"/>). Null (tests): the current UI culture's.
+    /// </summary>
+    public static string? AppLanguage { get; set; }
+
     public static async Task<MediaInfo> ProbeAsync(string input, CancellationToken ct = default)
     {
         string json = await Tools.RunAsync(Tools.Ffprobe,
@@ -74,19 +80,24 @@ public static class MediaEngine
     /// language (a film with English and Italian audio, opened by an Italian user, gives Italian),
     /// otherwise the one marked default, otherwise the first. Index among the audio tracks only.
     /// </summary>
-    public static int PreferredAudioTrack(IReadOnlyList<AudioTrackInfo> tracks, CultureInfo? culture = null)
+    public static int PreferredAudioTrack(IReadOnlyList<AudioTrackInfo> tracks, string? language = null)
     {
         if (tracks.Count == 0) return 0;
-        culture ??= CultureInfo.CurrentUICulture;
-        // Files use ISO 639-2, often the bibliographic codes (ger, fre) where .NET gives the terminology ones (deu, fra).
-        string[] wanted = culture.ThreeLetterISOLanguageName switch
+        // Not CultureInfo.CurrentUICulture: the released apps run with InvariantGlobalization, where
+        // it is always the invariant culture. The apps set AppLanguage from Strings.Language.
+        string lang = (language ?? AppLanguage ?? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName).ToLowerInvariant();
+        // Files use ISO 639-2, often the bibliographic codes (ger, fre) besides the terminology ones (deu, fra).
+        string[] wanted = lang switch
         {
-            "deu" => ["deu", "ger"],
-            "fra" => ["fra", "fre"],
+            "it" => ["ita", "it"],
+            "en" => ["eng", "en"],
+            "es" => ["spa", "es"],
+            "fr" => ["fra", "fre", "fr"],
+            "de" => ["deu", "ger", "de"],
             string code => [code],
         };
         for (int i = 0; i < tracks.Count; i++)
-            if (tracks[i].Language is string l && (wanted.Contains(l.ToLowerInvariant()) || l.Equals(culture.TwoLetterISOLanguageName, StringComparison.OrdinalIgnoreCase)))
+            if (tracks[i].Language is string l && wanted.Contains(l.ToLowerInvariant()))
                 return i;
         for (int i = 0; i < tracks.Count; i++)
             if (tracks[i].IsDefault) return i;

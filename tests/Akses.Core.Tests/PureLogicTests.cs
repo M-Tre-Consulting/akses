@@ -132,16 +132,35 @@ public class AudioTrackTests
     private static readonly AudioTrackInfo Eng = new("eng", true), Ita = new("ita", false), Ger = new("ger", false), None = new(null, false);
 
     [Theory]
-    [InlineData("it-IT", 1)] // the app's language, even when not the default track
-    [InlineData("de-DE", 2)] // "ger" (bibliographic) matches .NET's "deu"
-    [InlineData("es-ES", 0)] // no Spanish: the default track
-    public void Picks_the_app_language_then_the_default(string culture, int expected) =>
-        Assert.Equal(expected, MediaEngine.PreferredAudioTrack([Eng, Ita, Ger], new CultureInfo(culture)));
+    [InlineData("it", 1)] // the app's language, even when not the default track
+    [InlineData("de", 2)] // "ger" (bibliographic) counts as German too
+    [InlineData("es", 0)] // no Spanish: the default track
+    public void Picks_the_app_language_then_the_default(string language, int expected) =>
+        Assert.Equal(expected, MediaEngine.PreferredAudioTrack([Eng, Ita, Ger], language));
 
     [Fact]
     public void Without_tags_or_default_takes_the_first()
     {
-        Assert.Equal(0, MediaEngine.PreferredAudioTrack([None, None], new CultureInfo("it-IT")));
-        Assert.Equal(0, MediaEngine.PreferredAudioTrack([], new CultureInfo("it-IT")));
+        Assert.Equal(0, MediaEngine.PreferredAudioTrack([None, None], "it"));
+        Assert.Equal(0, MediaEngine.PreferredAudioTrack([], "it"));
+    }
+
+    /// <summary>The released apps run with InvariantGlobalization: the language comes from AppLanguage, not the culture.</summary>
+    [Fact]
+    public void Uses_the_app_language_when_the_culture_is_invariant()
+    {
+        CultureInfo before = CultureInfo.CurrentUICulture;
+        string? appBefore = MediaEngine.AppLanguage;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
+            MediaEngine.AppLanguage = "it";
+            Assert.Equal(1, MediaEngine.PreferredAudioTrack([Eng, Ita, Ger]));
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = before;
+            MediaEngine.AppLanguage = appBefore;
+        }
     }
 }

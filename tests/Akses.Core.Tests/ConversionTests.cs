@@ -260,8 +260,8 @@ public sealed class ConversionTests : IDisposable
             string film = Path.Combine(_dir, "film.mkv");
             await Tools.RunAsync(Tools.Ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", "-i", clip, "-i", meta,
                 "-map", "0:v", "-map_chapters", "1", "-c:v", "copy",
-                "-filter_complex", "[0:a]asplit[x][y];[x]aformat=channel_layouts=5.1[e];[y]aformat=channel_layouts=5.1[i]",
-                "-map", "[e]", "-map", "[i]", "-c:a", "flac",
+                // -ac 6 (5.1) rather than asplit/aformat: the slim Windows ffmpeg has no asplit.
+                "-map", "0:a", "-map", "0:a", "-ac", "6", "-c:a", "flac",
                 "-metadata:s:a:0", "language=eng", "-metadata:s:a:1", "language=ita", film], CancellationToken.None);
 
             MediaInfo src = await MediaEngine.ProbeAsync(film);
