@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Akses.Core;
 using Akses.Core.Engines;
@@ -123,5 +124,24 @@ public class OutputPathsTests
         {
             Directory.Delete(dir, true);
         }
+    }
+}
+
+public class AudioTrackTests
+{
+    private static readonly AudioTrackInfo Eng = new("eng", true), Ita = new("ita", false), Ger = new("ger", false), None = new(null, false);
+
+    [Theory]
+    [InlineData("it-IT", 1)] // the app's language, even when not the default track
+    [InlineData("de-DE", 2)] // "ger" (bibliographic) matches .NET's "deu"
+    [InlineData("es-ES", 0)] // no Spanish: the default track
+    public void Picks_the_app_language_then_the_default(string culture, int expected) =>
+        Assert.Equal(expected, MediaEngine.PreferredAudioTrack([Eng, Ita, Ger], new CultureInfo(culture)));
+
+    [Fact]
+    public void Without_tags_or_default_takes_the_first()
+    {
+        Assert.Equal(0, MediaEngine.PreferredAudioTrack([None, None], new CultureInfo("it-IT")));
+        Assert.Equal(0, MediaEngine.PreferredAudioTrack([], new CultureInfo("it-IT")));
     }
 }

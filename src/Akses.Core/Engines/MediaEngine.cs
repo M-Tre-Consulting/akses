@@ -3,9 +3,14 @@ using System.Text.Json;
 
 namespace Akses.Core.Engines;
 
-/// <summary>What ffprobe says about a file. Width and Height are as shown, after the rotation phones store in the file.</summary>
+/// <summary>What ffprobe says about a file. Width and Height are as shown, after the rotation phones store in the file.
+/// AudioTrack is the audio track Akses uses (0 = the first one, as in ffmpeg's "0:a:N"), and AudioCodec,
+/// SampleRate and Channels are that track's: see <see cref="MediaEngine.PreferredAudioTrack"/>.</summary>
 public sealed record MediaInfo(TimeSpan Duration, bool HasVideo, bool HasAudio, int Width, int Height, string? VideoCodec, string? AudioCodec,
-    double FrameRate = 0, int SampleRate = 0, int Channels = 0);
+    double FrameRate = 0, int SampleRate = 0, int Channels = 0, int AudioTrack = 0);
+
+/// <summary>One audio track as ffprobe lists it: its language tag ("ita", "eng"…, null when missing) and the default flag.</summary>
+public sealed record AudioTrackInfo(string? Language, bool IsDefault);
 
 /// <summary>Audio, video and subtitles, through ffmpeg/ffprobe.</summary>
 public static class MediaEngine
@@ -23,10 +28,11 @@ public static class MediaEngine
         if (root.TryGetProperty("format", out JsonElement format) && format.TryGetProperty("duration", out JsonElement d))
             double.TryParse(d.GetString(), NumberStyles.Float, Inv, out seconds);
 
-        bool hasVideo = false, hasAudio = false;
+        bool hasVideo = false;
         int width = 0, height = 0, sampleRate = 0, channels = 0;
         double frameRate = 0;
         string? vcodec = null, acodec = null;
+        var audio = new List<JsonElement>();
         if (root.TryGetProperty("streams", out JsonElement streams))
         {
             foreach (JsonElement s in streams.EnumerateArray())
@@ -45,16 +51,46 @@ public static class MediaEngine
                     double avg = Rate(s, "avg_frame_rate");
                     frameRate = avg is > 0 and <= 240 ? avg : Rate(s, "r_frame_rate");
                 }
-                else if (type == "audio" && !hasAudio)
-                {
-                    hasAudio = true;
-                    acodec = codec;
-                    if (s.TryGetProperty("sample_rate", out JsonElement sr)) int.TryParse(sr.GetString(), NumberStyles.Integer, Inv, out sampleRate);
-                    channels = s.TryGetProperty("channels", out JsonElement ch) ? ch.GetInt32() : 0;
-                }
+                else if (type == "audio")
+                    audio.Add(s);
             }
         }
-        return new MediaInfo(TimeSpan.FromSeconds(seconds), hasVideo, hasAudio, width, height, vcodec, acodec, frameRate, sampleRate, channels);
+
+        int track = PreferredAudioTrack(audio.Select(s => new AudioTrackInfo(
+            s.TryGetProperty("tags", out JsonElement tags) && tags.TryGetProperty("language", out JsonElement lang) ? lang.GetString() : null,
+            s.TryGetProperty("disposition", out JsonElement disp) && disp.TryGetProperty("default", out JsonElement def) && def.GetInt32() == 1)).ToList());
+        if (audio.Count > 0)
+        {
+            JsonElement a = audio[track];
+            acodec = a.TryGetProperty("codec_name", out JsonElement c) ? c.GetString() : null;
+            if (a.TryGetProperty("sample_rate", out JsonElement sr)) int.TryParse(sr.GetString(), NumberStyles.Integer, Inv, out sampleRate);
+            channels = a.TryGetProperty("channels", out JsonElement ch) ? ch.GetInt32() : 0;
+        }
+        return new MediaInfo(TimeSpan.FromSeconds(seconds), hasVideo, audio.Count > 0, width, height, vcodec, acodec, frameRate, sampleRate, channels, track);
+    }
+
+    /// <summary>
+    /// Which audio track to keep when the output has room for one (MP4, MP3…): the one in the app's
+    /// language (a film with English and Italian audio, opened by an Italian user, gives Italian),
+    /// otherwise the one marked default, otherwise the first. Index among the audio tracks only.
+    /// </summary>
+    public static int PreferredAudioTrack(IReadOnlyList<AudioTrackInfo> tracks, CultureInfo? culture = null)
+    {
+        if (tracks.Count == 0) return 0;
+        culture ??= CultureInfo.CurrentUICulture;
+        // Files use ISO 639-2, often the bibliographic codes (ger, fre) where .NET gives the terminology ones (deu, fra).
+        string[] wanted = culture.ThreeLetterISOLanguageName switch
+        {
+            "deu" => ["deu", "ger"],
+            "fra" => ["fra", "fre"],
+            string code => [code],
+        };
+        for (int i = 0; i < tracks.Count; i++)
+            if (tracks[i].Language is string l && (wanted.Contains(l.ToLowerInvariant()) || l.Equals(culture.TwoLetterISOLanguageName, StringComparison.OrdinalIgnoreCase)))
+                return i;
+        for (int i = 0; i < tracks.Count; i++)
+            if (tracks[i].IsDefault) return i;
+        return 0;
     }
 
     /// <summary>Degrees a phone video is turned when played: the display matrix, or the old "rotate" tag.</summary>
@@ -100,7 +136,7 @@ public static class MediaEngine
         if (audioOnly)
         {
             if (!info.HasAudio) throw new InvalidDataException("no audio track");
-            args.AddRange(["-map", "0:a:0", "-vn", "-sn", "-dn"]);
+            args.AddRange(["-map", $"0:a:{info.AudioTrack}", "-vn", "-sn", "-dn"]);
             args.AddRange(CanCopyAudio(info.AudioCodec, ext) && quality == Quality.High ? ["-c:a", "copy"] : AudioEncoder(ext, quality));
             if (ext == "mp3") args.AddRange(["-id3v2_version", "3"]);
         }
@@ -117,7 +153,7 @@ public static class MediaEngine
             if (!info.HasVideo) throw new InvalidDataException("no video track");
             bool copyVideo = quality == Quality.High && maxSide is null && CanCopyVideo(info.VideoCodec, ext);
             bool copyAudio = copyVideo && CanCopyAudio(info.AudioCodec, ext);
-            args.AddRange(["-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn"]);
+            args.AddRange(["-map", "0:v:0", "-map", $"0:a:{info.AudioTrack}?", "-sn", "-dn"]);
             if (copyVideo)
                 args.AddRange(["-c:v", "copy"]);
             else
@@ -126,7 +162,14 @@ public static class MediaEngine
                 args.AddRange(["-vf", ScaleFilter(maxSide)]);
             }
             args.AddRange(copyAudio ? ["-c:a", "copy"] : VideoAudioEncoder(ext, quality));
-            if (ext is "mp4" or "mov") args.AddRange(["-movflags", "+faststart"]);
+            if (ext is "mp4" or "mov")
+            {
+                // MP4 is the "plays everywhere" format: stereo AAC (TVs and old players often can't
+                // decode 5.1), and no chapters (in MP4 they become an extra text track that some
+                // players refuse).
+                if (!copyAudio && info.Channels > 2) args.AddRange(["-ac", "2"]);
+                args.AddRange(["-map_chapters", "-1", "-movflags", "+faststart"]);
+            }
             if (ext == "mp4" && (copyVideo ? info.VideoCodec : "h264") == "hevc") args.AddRange(["-tag:v", "hvc1"]);
         }
         args.Add(output);
@@ -174,7 +217,8 @@ public static class MediaEngine
 
     private static bool CanCopyAudio(string? codec, string ext) => ext switch
     {
-        "mp4" or "mov" => codec is "aac" or "mp3" or "alac" or "ac3",
+        // Not AC3/E-AC3/DTS: valid in MP4, but many TVs and players then play the video without sound.
+        "mp4" or "mov" => codec is "aac" or "mp3" or "alac",
         "mkv" => codec is not null,
         "webm" => codec is "opus" or "vorbis",
         "mp3" => codec == "mp3",

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json.Nodes;
 using Akses.Core;
 using Akses.Core.Engines;
 using ImageMagick;
@@ -239,6 +241,48 @@ public sealed class ConversionTests : IDisposable
             Assert.True(new FileInfo(await Converter.ConvertAsync(json, t, Defaults, null, CancellationToken.None)).Length > 0);
         string xmlBack = await Converter.ConvertAsync(Path.Combine(_dir, "people.xml"), FormatCatalog.Json, Defaults, null, CancellationToken.None);
         Assert.Contains("Savona", await File.ReadAllTextAsync(xmlBack));
+    }
+
+    /// <summary>
+    /// A film with English then Italian 5.1 audio and chapters, the way they come from a Blu-ray
+    /// rip: the MP4 (for a TV) keeps the app's language, in stereo AAC, and no chapter track.
+    /// </summary>
+    [Fact]
+    public async Task Mp4_keeps_the_audio_in_the_app_language_stereo_without_chapters()
+    {
+        CultureInfo before = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = new CultureInfo("it-IT");
+        try
+        {
+            string clip = await Media("film-src.mp4", video: true);
+            string meta = Path.Combine(_dir, "chapters.txt");
+            await File.WriteAllTextAsync(meta, ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=1500\ntitle=Uno\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=1500\nEND=3000\ntitle=Due\n");
+            string film = Path.Combine(_dir, "film.mkv");
+            await Tools.RunAsync(Tools.Ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", "-i", clip, "-i", meta,
+                "-map", "0:v", "-map_chapters", "1", "-c:v", "copy",
+                "-filter_complex", "[0:a]asplit[x][y];[x]aformat=channel_layouts=5.1[e];[y]aformat=channel_layouts=5.1[i]",
+                "-map", "[e]", "-map", "[i]", "-c:a", "flac",
+                "-metadata:s:a:0", "language=eng", "-metadata:s:a:1", "language=ita", film], CancellationToken.None);
+
+            MediaInfo src = await MediaEngine.ProbeAsync(film);
+            Assert.Equal(1, src.AudioTrack);
+            Assert.Equal(6, src.Channels);
+
+            string output = await Converter.ConvertAsync(film, FormatCatalog.Mp4, Defaults, null, CancellationToken.None);
+            string json = await Tools.RunAsync(Tools.Ffprobe, ["-v", "error", "-print_format", "json", "-show_streams", "-show_chapters", output], CancellationToken.None);
+            JsonNode root = JsonNode.Parse(json)!;
+            JsonArray streams = root["streams"]!.AsArray();
+            Assert.Equal(2, streams.Count); // video + one audio, no chapter text track
+            JsonNode audio = streams.Single(s => (string?)s!["codec_type"] == "audio")!;
+            Assert.Equal("aac", (string?)audio["codec_name"]);
+            Assert.Equal(2, (int?)audio["channels"]);
+            Assert.Equal("ita", (string?)audio["tags"]?["language"]);
+            Assert.Empty(root["chapters"]!.AsArray());
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = before;
+        }
     }
 
     [Fact]
